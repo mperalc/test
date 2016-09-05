@@ -9,14 +9,41 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Initial exploration and QC of count data
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+In this document I will explore the two versions of counts data I have: conservative counts and RSEM. I will then perform the filtering and QC of both, and the differential expression analysis.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r setup, echo=FALSE}
 
-```{r cars}
-summary(cars)
+# Load necessary libraries
+
+library(readr) # fast reading of large files
+library(edgeR)
+library(biomaRt)  # for gene information
+library(pheatmap)
+library(RColorBrewer)
+library(org.Hs.eg.db)
+library(limma)
+library(ggbiplot)
+library(ggrepel) # provides geoms for ggplot2 to repel overlapping text labels.
+library(ggplot2)
+library(ggfortify)
+
+
+# Working directory:
+setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2")
+
+my_files <- list.files("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2",pattern=".results")   # creates list of files to import, containing gene-level count data (RSEM)
+# pattern chooses only files that include ".results". That way I exclude directories I have under my folder "Diff_v2".
+
+
+donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
+
+stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
+
+
+
+
 ```
 
 ## Including Plots
