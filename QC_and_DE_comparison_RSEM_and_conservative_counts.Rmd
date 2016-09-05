@@ -89,12 +89,20 @@ rownames(counts_RSEM) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(counts_RSEM)) # 
 
 counts_cc=as.data.frame(cc)   # make counts data frame
 
+rownames(counts_cc) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(counts_cc)) # cut everything after the dot
+
 
 ```
 RSEM counts initially has `r nrow(counts_RSEM)` genes, and looks like this: 
 ```{r RSEM counts, echo=FALSE, tidy=TRUE}
 
 counts_RSEM[1:2,1:6]
+
+```
+RSEM counts initially has `r nrow(counts_cc)` genes, and looks like this: 
+```{r conservative counts, echo=FALSE, tidy=TRUE}
+
+counts_cc[1:2,1:6]
 
 ```
 
@@ -106,6 +114,7 @@ Now I want to keep in my count object just the genes that still exist in ENSEMBL
 
 #get gene information for the Ensembl IDs
 ensembl <- useMart("ENSEMBL_MART_ENSEMBL",dataset="hsapiens_gene_ensembl",host="www.ensembl.org")
+
 all_ensembl_info_RSEM <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
                           filters = 'ensembl_gene_id', values = rownames(counts_RSEM), mart = ensembl)
 
@@ -115,7 +124,14 @@ rownames(all_ensembl_info_RSEM) <- all_ensembl_info_RSEM$ensembl_gene_id
 #keep genes in counts whose geneID still exists in Ensembl
 counts_RSEM <- counts_RSEM[all_ensembl_info_RSEM$ensembl_gene_id,] 
 
+#conservative counts
+
+all_ensembl_info_cc <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
+                          filters = 'ensembl_gene_id', values = rownames(counts_cc), mart = ensembl)
+rownames(all_ensembl_info_cc) <- all_ensembl_info_cc$ensembl_gene_id
+
+counts_cc <- counts_cc[all_ensembl_info_cc$ensembl_gene_id,] #keep genes in counts whose geneID still exists in Ensembl
 
 ```
-After trimming, RSEM counts has `r nrow(counts_RSEM)` genes.
+After trimming, RSEM counts has `r nrow(counts_RSEM)` genes, and conservative counts has `r nrow(counts_cc)` genes.
 
