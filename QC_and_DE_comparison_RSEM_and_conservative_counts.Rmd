@@ -1,0 +1,137 @@
+---
+title: "QC + DE comparison RSEM & conservative counts"
+author: "Marta Perez Alcantara"
+date: "5 de septiembre de 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Initial exploration and QC of count data
+
+In this document I will explore the two versions of counts data I have: conservative counts and RSEM. I will then perform the filtering and QC of both, and the differential expression analysis.
+
+```{r loading files, include=FALSE}
+
+# Load necessary libraries
+
+library(readr) # fast reading of large files
+library(edgeR)
+library(biomaRt)  # for gene information
+library(pheatmap)
+library(RColorBrewer)
+library(org.Hs.eg.db)
+library(limma)
+library(ggbiplot)
+library(ggrepel) # provides geoms for ggplot2 to repel overlapping text labels.
+library(ggplot2)
+library(ggfortify)
+
+
+# Working directory conservative counts:
+setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/other_counts")
+
+
+cc=read_tsv("27.07.2016.Differentiation_v2.gene.counts.tsv")  # master object, is a list of matrices (24 elements, 1 per sample)
+# each element of the list is a matrix with 57915 rows (gene ids) and 17 columns (gene id, length, counts, TPM, etc)
+
+
+# Working directory RSEM:
+setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2")
+
+my_files <- list.files("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2",pattern=".results")   # creates list of files to import, containing gene-level count data (RSEM)
+# pattern chooses only files that include ".results". That way I exclude directories I have under my folder "Diff_v2".
+
+
+
+donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
+
+stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
+
+
+### 1. Load all gene count files for the different samples and stages
+
+#RSEM counts
+
+RSEM=lapply(my_files,read_tsv)  # RSEM master object, is a list of matrices (24 elements, 1 per sample)
+# each element of the list is a matrix with 57915 rows (gene ids) and 17 columns (gene id, length, counts, TPM, etc)
+names(RSEM)=my_files            #assigned the names of the files to each matrix
+
+ 
+
+```
+After loading the counts, I create a "counts" object, with genes as rows and samples as columns. 
+
+
+```{r count object, echo=FALSE}
+
+#RSEM 
+
+counts_RSEM=sapply(RSEM, function(x) x[[5]]) # get ("[") 5th column (expected_counts) of each element in "counts" (list of matrices) and combine as matrix
+counts_RSEM=as.data.frame(counts_RSEM)
+g_RSEM=RSEM$Ad2.1DE.genes.results$gene_id    # take gene ids
+
+rownames(counts_RSEM)=g_RSEM
+
+rm(g_RSEM)
+
+
+
+#cut the version number of the Ensembl IDs
+rownames(counts_RSEM) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(counts_RSEM)) # cut everything after the dot
+
+
+
+#conservative counts
+
+
+counts_cc=as.data.frame(cc)   # make counts data frame
+
+rownames(counts_cc) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(counts_cc)) # cut everything after the dot
+
+
+```
+RSEM counts initially has `r nrow(counts_RSEM)` genes, and looks like this: 
+```{r RSEM counts, echo=FALSE, tidy=TRUE}
+
+counts_RSEM[1:2,1:6]
+
+```
+RSEM counts initially has `r nrow(counts_cc)` genes, and looks like this: 
+```{r conservative counts, echo=FALSE, tidy=TRUE}
+
+counts_cc[1:2,1:6]
+
+```
+
+Now I want to keep in my count object just the genes that still exist in ENSEMBL.
+
+```{r ENSEMBL trimming, echo=FALSE}
+
+#RSEM counts
+
+#get gene information for the Ensembl IDs
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL",dataset="hsapiens_gene_ensembl",host="www.ensembl.org")
+
+all_ensembl_info_RSEM <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
+                          filters = 'ensembl_gene_id', values = rownames(counts_RSEM), mart = ensembl)
+
+
+rownames(all_ensembl_info_RSEM) <- all_ensembl_info_RSEM$ensembl_gene_id
+
+#keep genes in counts whose geneID still exists in Ensembl
+counts_RSEM <- counts_RSEM[all_ensembl_info_RSEM$ensembl_gene_id,] 
+
+#conservative counts
+
+all_ensembl_info_cc <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
+                          filters = 'ensembl_gene_id', values = rownames(counts_cc), mart = ensembl)
+rownames(all_ensembl_info_cc) <- all_ensembl_info_cc$ensembl_gene_id
+
+counts_cc <- counts_cc[all_ensembl_info_cc$ensembl_gene_id,] #keep genes in counts whose geneID still exists in Ensembl
+
+```
+After trimming, RSEM counts has `r nrow(counts_RSEM)` genes, and conservative counts has `r nrow(counts_cc)` genes.
+
