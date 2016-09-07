@@ -26,6 +26,7 @@ library(ggrepel) # provides geoms for ggplot2 to repel overlapping text labels.
 library(ggplot2)
 library(ggfortify)
 library(reshape2)  # to modify dataframes for ggplot2
+library(knitr)   #for tables in rmd
 
 
 setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects")
@@ -39,7 +40,7 @@ stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stag
 
 
 ```
-First I calculate the normalization factors using TMM.
+Our DGE object for conservative counts has `r nrow(dge_cc$counts)` genes. First I calculate the normalization factors using TMM.
 
 ```{r normalization factors,echo=FALSE}
 
@@ -49,8 +50,150 @@ dge_cc <- calcNormFactors(dge_cc)    # TMM by default, RLE or UQ also possible
 
 
 ```
-More changes for new branch
+
+Now I'll create the design matrix. 
+
+```{r design matrix, echo=FALSE}
+ 
+samples <- c(rep(c("sample1","sample2","sample3"),8))   # create the design matrix
+samples=as.factor(samples)
+stages <-rep(stage,each=3) 
+stages <- as.factor(stages)
+design1 <- model.matrix(~stages + samples)                    
+kable(design1)
+```
+
+The base in the design matrix is sample 1 for the samples, and DE for the stages (they don't appear on the design matrix because it has all the information now about all the samples and stages). This design matrix has the information for every stage. But if I want to test 1 stage vs all others, I could create from that a simplified matrix. For example, for iPSC:
+
+```{r simple design matrix, echo=FALSE}
+
+d=as.data.frame(design1)
+test_iPSc=as.factor(d$stagesiPSC)    # for iPSC. Here I am testing 1 stage (with all samples) vs all the other stages
+
+design_iPSC=model.matrix(~samples+test_iPSc)
+
+kable(design_iPSC)
+
+```
+
+For the linear model, I'll do a voom transformation. It uses the experiment design matrix, and produces an EList object using normalised data to convert the read counts to log2-cpm, with associated weights, ready for linear modelling.The limma-voom method assumes that rows with zero or very low counts have been removed. For design matrix with iPSC only:
 
 
+```{r voom normalization, echo=FALSE}
 
 
+v2=voom(dge_cc,design=design_iPSC,plot=TRUE)    #iPSC vs other stages
+
+
+```
+
+
+Including in the design matrix all stages:
+
+```{r voom normalization all, echo=FALSE}
+
+
+v1=voom(dge_cc,design=design1,plot=TRUE)  #with all samples and stages
+
+```
+
+
+There is very high biological variation due to systematic differences between stages and samples. Why is the variation lower than with just one stage?
+Before fitting the linear model, I'll perform multi-dimensional scaling:  Plot samples on a two-dimensional scatterplot so that distances on the plot approximate the typical log2 fold changes between the samples (MDS).
+
+
+```{r mds, echo=FALSE, fig.width=7, fig.height=7,}
+
+#function wrap so that plotMDS doesn't produce a plot when called:
+plotMDS.invisible <- function(...){
+    ff <- tempfile()
+    png(filename=ff)
+    res <- plotMDS(...)
+    dev.off()
+    unlink(ff)
+    res
+}
+
+pretty_mds=function(v2){
+  mds_p=plotMDS.invisible(v2$E,gene.selection = "pairwise")    # pairwise method (default)
+  mds_c=plotMDS.invisible(v2$E,gene.selection = "common")      #common method 
+  
+  
+  # Rearrange data for ggplot
+  
+  # method: pairwise
+  m_p=as.data.frame(mds_p$cmdscale.out)
+  m_p <- cbind(m_p,sample=samples,stage=stages)
+  colnames(m_p)=c("Dimension 1", "Dimension 2", "Samples","Stages")
+  
+  # method: common
+  m_c=as.data.frame(mds_c$cmdscale.out)
+  m_c <- cbind(m_c,sample=samples,stage=stages)
+  colnames(m_c)=c("Dimension 1", "Dimension 2", "Samples","Stages")
+  
+  
+  # plot pairwise
+  
+ # if(qc_plots==TRUE){
+    #tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MDS_pairwise_only_ours.tiff", type="cairo",
+        # width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw")
+    mp=ggplot(m_p) +
+      geom_point(aes(`Dimension 1` ,`Dimension 2`), size = 2, color = 'grey') +
+      geom_label_repel(
+        aes(`Dimension 1` , `Dimension 2`, fill = factor(Samples), label = Stages),
+        fontface = 'bold', color = 'white',
+        box.padding = unit(0.25, "lines"),
+        point.padding = unit(0.25, "lines")
+      ) +
+      coord_fixed(ratio = 1.2) +
+      
+      theme_bw(base_size=20) + 
+      theme(plot.background = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank() )+
+      theme(panel.border= element_rect())+
+      
+      theme(legend.position = "bottom")  +
+      ggtitle("MDS plot:pairwise method")+
+      labs(fill = "Sample")
+   # dev.off()
+    
+    # plot common
+    # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MDS_common_only_ours.tiff", type="cairo",
+    #      width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw")
+   mc= ggplot(m_c) +
+      geom_point(aes(`Dimension 1` ,`Dimension 2`), size = 2, color = 'grey') +
+      geom_label_repel(
+        aes(`Dimension 1` , `Dimension 2`, fill = factor(Samples), label = Stages),
+        fontface = 'bold', color = 'white',
+        box.padding = unit(0.25, "lines"),
+        point.padding = unit(0.25, "lines")
+      ) +
+     coord_fixed(ratio = 2) +  #fix x-y ratio
+      
+      theme_bw(base_size=20) + 
+      theme(plot.background = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank() )+
+      theme(panel.border= element_rect())+
+      
+      theme(legend.position = "bottom")  +
+      ggtitle("MDS plot: common method")+
+      labs(fill = "Sample")
+   # dev.off()
+    
+#  }
+   return(list(mp,mc))   #return both plots as a list
+}
+
+mds_plots=pretty_mds(v2)
+
+plot(mds_plots[[1]])
+plot(mds_plots[[2]])
+
+
+```
+
+The distance between each pair of samples is the root-mean-square deviation (Euclidean distance) for the top genes. Distances on the plot can be interpreted as leading log2-fold-change, meaning the typical (root-mean-square) log2-fold-change between the samples for the genes that distinguish those samples. If gene.selection is "common", then the top genes are those with the largest standard deviations between samples. If gene.selection is "pairwise", then a different set of top genes is selected for each pair of samples. The pairwise feature selection may be appropriate for microarray data when different molecular pathways are relevant for distinguishing different pairs of samples. 
+
+In this case, we see for the "pairwise" method that EN stages cluster by stage (6 or 7) and not by sample. In the "common" method, the opposite happens. Nothing else changes much between the two plots. My interpretation is that the genes that drive the variance between all stages, that are used in the common method, are not the ones that distinguish the late EN stages. There is in reality for EN a much higher similarity between samples than between stages, and therefore the stages need to be separated by different genes (as shown in the pairwise method). Plotting the two versions shows us interesting information about the data. The "pairwise" method also shows that samples Ad2.1 and Neo1.1 are closer in EN stage 7 than sample Ad3.1. We saw from the longitudinal TPM plots of selected marker genes that sample Ad3.1 is better differentiated.
