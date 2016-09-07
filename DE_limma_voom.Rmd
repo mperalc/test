@@ -49,7 +49,7 @@ dge_cc <- calcNormFactors(dge_cc)    # TMM by default, RLE or UQ also possible
 
 
 ```
-Changes, changes
+Amended changes
 
 
 
