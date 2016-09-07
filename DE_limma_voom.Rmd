@@ -1,0 +1,56 @@
+---
+title: "Differential expression limma+voom"
+author: "Marta Perez Alcantara"
+date: "6 de septiembre de 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Differential expression using limma+voom
+
+In this document I will perform an "static" differential expression analysis, comparing one stage to the others and taking into account the samples.
+I start loading the dge object for conservative counts.
+
+```{r initial,echo=FALSE}
+
+
+library(pheatmap)
+library(RColorBrewer)
+library(org.Hs.eg.db)
+library(limma)
+library(ggbiplot)
+library(ggrepel) # provides geoms for ggplot2 to repel overlapping text labels.
+library(ggplot2)
+library(ggfortify)
+library(reshape2)  # to modify dataframes for ggplot2
+
+
+setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects")
+
+load(file="dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
+
+
+donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
+
+stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
+
+
+```
+First I calculate the normalization factors using TMM.
+
+```{r normalization factors,echo=FALSE}
+
+
+dge_cc <- calcNormFactors(dge_cc)    # TMM by default, RLE or UQ also possible
+
+
+
+```
+Amended changes
+
+
+
+

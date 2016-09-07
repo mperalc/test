@@ -20,14 +20,8 @@ In this document I will explore the two versions of counts data I have: conserva
 library(readr) # fast reading of large files
 library(edgeR)
 library(biomaRt)  # for gene information
-library(pheatmap)
-library(RColorBrewer)
-library(org.Hs.eg.db)
-library(limma)
-library(ggbiplot)
-library(ggrepel) # provides geoms for ggplot2 to repel overlapping text labels.
-library(ggplot2)
-library(ggfortify)
+
+library(knitr)   # for kable tables
 
 
 # Working directory conservative counts:
@@ -39,9 +33,9 @@ cc=read_tsv("27.07.2016.Differentiation_v2.gene.counts.tsv")  # master object, i
 
 
 # Working directory RSEM:
-setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2")
+setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/RSEM")
 
-my_files <- list.files("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2",pattern=".results")   # creates list of files to import, containing gene-level count data (RSEM)
+my_files <- list.files("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/RSEM",pattern=".results")   # creates list of files to import, containing gene-level count data (RSEM)
 # pattern chooses only files that include ".results". That way I exclude directories I have under my folder "Diff_v2".
 
 
@@ -70,11 +64,12 @@ After loading the counts, I create a "counts" object, with genes as rows and sam
 #RSEM 
 
 counts_RSEM=sapply(RSEM, function(x) x[[5]]) # get ("[") 5th column (expected_counts) of each element in "counts" (list of matrices) and combine as matrix
+
 counts_RSEM=as.data.frame(counts_RSEM)
 g_RSEM=RSEM$Ad2.1DE.genes.results$gene_id    # take gene ids
 
 rownames(counts_RSEM)=g_RSEM
-
+rm(RSEM)
 rm(g_RSEM)
 
 
@@ -88,6 +83,9 @@ rownames(counts_RSEM) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(counts_RSEM)) # 
 
 
 counts_cc=as.data.frame(cc)   # make counts data frame
+rm(cc)
+rownames(counts_cc)=counts_cc[,1]
+counts_cc=counts_cc[,c(-1:-2)]
 
 rownames(counts_cc) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(counts_cc)) # cut everything after the dot
 
@@ -96,17 +94,43 @@ rownames(counts_cc) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(counts_cc)) # cut 
 RSEM counts initially has `r nrow(counts_RSEM)` genes, and looks like this: 
 ```{r RSEM counts, echo=FALSE, tidy=TRUE}
 
-counts_RSEM[1:2,1:6]
+
+# order columns by stages, 3 by 3. This will help the following filtering step
+
+order_by_stages=function(counts,stage.=stage){
+nc=counts[ , grepl( "iPSC" , names( counts) ) ]  #takes columns whose name matches x
+
+#Do the same for the other stages
+
+for (s in stage.[-1])  {         
+  
+  i= counts[ , grepl( s , names( counts ) ) ]
+  nc=cbind(nc,i)
+}
+
+return(nc)
+}
+
+counts_RSEM=order_by_stages(counts_RSEM)
+
+colnames(counts_RSEM)=paste( rep(stage,each=3),rep(donors,8),sep="_" )
+
+kable(counts_RSEM[1:2,1:6])
 
 ```
-RSEM counts initially has `r nrow(counts_cc)` genes, and looks like this: 
+Conservative counts initially has `r nrow(counts_cc)` genes, and looks like this: 
 ```{r conservative counts, echo=FALSE, tidy=TRUE}
 
-counts_cc[1:2,1:6]
+# do the same for conservative counts
+
+counts_cc=order_by_stages(counts_cc)
+colnames(counts_cc)=paste( rep(stage,each=3),rep(donors,8),sep="_" )
+
+kable(counts_cc[1:2,1:6])
 
 ```
 
-Now I want to keep in my count object just the genes that still exist in ENSEMBL.
+Now I will keep in my count object just the genes that still exist in ENSEMBL.
 
 ```{r ENSEMBL trimming, echo=FALSE}
 
@@ -125,6 +149,7 @@ rownames(all_ensembl_info_RSEM) <- all_ensembl_info_RSEM$ensembl_gene_id
 counts_RSEM <- counts_RSEM[all_ensembl_info_RSEM$ensembl_gene_id,] 
 
 #conservative counts
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL",dataset="hsapiens_gene_ensembl",host="www.ensembl.org")
 
 all_ensembl_info_cc <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
                           filters = 'ensembl_gene_id', values = rownames(counts_cc), mart = ensembl)
@@ -134,4 +159,186 @@ counts_cc <- counts_cc[all_ensembl_info_cc$ensembl_gene_id,] #keep genes in coun
 
 ```
 After trimming, RSEM counts has `r nrow(counts_RSEM)` genes, and conservative counts has `r nrow(counts_cc)` genes.
+
+Now I want to keep in my count object genes with at least 1 cpm in at least one stage.
+
+
+```{r cpm trimming, echo=FALSE}
+
+
+# create DGE object
+
+group <- rep(stage,each=3)    #group by stages 
+
+
+#for RSEM
+
+dge_RSEM <- DGEList(counts=counts_RSEM,group=group,genes=all_ensembl_info_RSEM) #create dge object
+
+all_ensembl_info_RSEM=all_ensembl_info_RSEM[rownames(dge_RSEM$counts),] #keep in gene info file the genes that still are in counts
+
+keep_RSEM <- rowSums(cpm(dge_RSEM)>1) >= 3          #computes cpm on dge object gene counts, and keeps rows with cpm=>3 (because there are 3 samples per stage)
+# in theory, this would also keep rows with cpm>1 in three different stages, that may be of the same sample...
+
+dge_RSEM <- dge_RSEM[keep_RSEM, , keep.lib.sizes=FALSE] 
+
+#same for conservative counts
+
+
+dge_cc <- DGEList(counts=counts_cc,group=group,genes=all_ensembl_info_cc) 
+all_ensembl_info_cc=all_ensembl_info_cc[rownames(dge_cc$counts),] 
+
+keep_cc <- rowSums(cpm(dge_cc)>1) >= 3   
+dge_cc <- dge_cc[keep_cc, , keep.lib.sizes=FALSE]     
+
+```
+After trimming, RSEM counts has `r nrow(dge_RSEM)` genes, and conservative counts has `r nrow(dge_cc)` genes.
+
+Now I want to correct the problem from the previous QC: I want to remove genes in which at least one stage has counts for ALL 3 samples.
+
+```{r more trimming, echo=FALSE}
+
+#Now to the real filtering
+
+# go through the table 3 by 3
+# if there are more than 2 values in three columns above 0, go to next row.
+# if not, go to next 3
+# if gets to end of loop and not found the values, get that row. After loop, subset matrix excluding those rows
+
+trim_by_stage=function(dge){
+  data=dge$counts
+  data[data>0]=1 # convert to table where 0=0 and 1 equals any value above 0
+
+  c=c() # initiate vector of numbers, to save rows to take out of matrix
+
+  for (r in 1:nrow(data)){
+   for (i in seq(1,24,3)){   # loop through stages 3 by 3 (to jump over samples of same stage)
+    
+     if (sum(data[r,c(i,i+1,i+2)]) > 2) {
+      
+        break
+      }
+      if (i==22){
+      
+        c=c(c,r)  # if it gets to the end and there are no valid values, append to vector
+      }
+    
+    
+   }
+  
+  }
+
+rm(data)
+return(c)
+
+}
+
+
+#for RSEM
+
+c=trim_by_stage(dge_RSEM)
+
+
+# % that fail
+
+fail_RSEM=100*(length(c)/nrow(dge_RSEM$counts))
+genes_fail_RSEM=length(c)
+# 17%    4228 rows. Therefore, the cause against which I made the function above is not uncommon, although very rare with conservative counts
+
+
+dge_RSEM$counts=as.data.frame(dge_RSEM$counts[-c,])    # counts now has 20287 genes
+rm(c)
+
+
+all_ensembl_info_RSEM=all_ensembl_info_RSEM[rownames(dge_RSEM$counts),] #keep in gene info file the genes that still are in counts
+
+#for conservative counts
+
+
+c=trim_by_stage(dge_cc)
+fail_cc=100*(length(c)/nrow(dge_cc$counts))
+genes_fail_cc=length(c)
+dge_cc$counts=as.data.frame(dge_cc$counts[-c,])    # counts now has 20287 genes
+rm(c)
+all_ensembl_info_cc=all_ensembl_info_cc[rownames(dge_cc$counts),] #keep in gene info file the genes that still are in counts
+
+```
+After trimming, RSEM counts has `r nrow(dge_RSEM)` genes, and conservative counts has `r nrow(dge_cc)` genes. RSEM counts has lost `r genes_fail_RSEM` genes (`r fail_RSEM`% from previous total). Conservative counts has lost  `r genes_fail_cc` genes (`r fail_cc`% from previous total).
+
+Now I will 1) keep only lincRNA and protein coding genes, and 2) exclude mitochondrial genes and those in sex chromosomes.
+``` {r even more trimming, echo=FALSE}
+
+
+# RSEM
+
+#remove genes that are not annotated as lincRNA or protein_coding
+before=nrow(dge_RSEM)
+dge_RSEM <- dge_RSEM[which(dge_RSEM$genes$gene_biotype == "protein_coding" | dge_RSEM$genes$gene_biotype == "lincRNA"),]
+
+gene_lost_step_1_RSEM=before-nrow(dge_RSEM)
+before=nrow(dge_RSEM)
+
+# use only autosomal genes (not sex genes or mitocondrial genes)
+chr <- c(1:22)
+dge_RSEM <- dge_RSEM[which(dge_RSEM$genes$chromosome_name %in% chr),]
+
+gene_lost_step_2_RSEM=before-nrow(dge_RSEM)
+rm(before)
+
+# 16847 genes left
+
+all_ensembl_info_RSEM=all_ensembl_info_RSEM[rownames(dge_RSEM$counts),] #keep in gene info file the genes that still are in counts
+
+#update DGE object with gene counts
+
+dge_RSEM$genes=all_ensembl_info_RSEM
+
+missing=grep("NA", rownames(dge_RSEM$counts))  #for some reason I have over 2000 NA values at the end of the table, and can access the table outside its boundaries (which gives NA values)
+
+dge_RSEM=dge_RSEM[-missing,]
+
+# conservative counts
+
+before=nrow(dge_cc)
+dge_cc <- dge_cc[which(dge_cc$genes$gene_biotype == "protein_coding" | dge_cc$genes$gene_biotype == "lincRNA"),]
+
+gene_lost_step_1_cc=before-nrow(dge_cc)
+before=nrow(dge_cc)
+
+chr <- c(1:22)
+dge_cc <- dge_cc[which(dge_cc$genes$chromosome_name %in% chr),]
+
+gene_lost_step_2_cc=before-nrow(dge_cc)
+rm(before)
+
+all_ensembl_info_cc=all_ensembl_info_cc[rownames(dge_cc$counts),]
+dge_cc$genes=all_ensembl_info_cc
+
+missing=grep("NA", rownames(dge_cc$counts))  #for some reason I have 2 NA values at the end of the table, and can access the table outside its boundaries (which gives NA values)
+
+dge_cc=dge_cc[-missing,]
+
+```
+After trimming, RSEM counts has `r nrow(dge_RSEM)` genes, and lost `r gene_lost_step_1_RSEM` genes on the first trim, and `r gene_lost_step_2_RSEM` genes on the second. Conservative counts has `r nrow(dge_cc)` genes, and lost `r gene_lost_step_1_cc` genes on the first trim, and `r gene_lost_step_2_cc` genes on the second. 
+
+Now we see the library sizes for RSEM counts:
+``` {r library RSEM, echo=FALSE}
+kable(dge_RSEM$samples[,-3])
+```
+
+And the library sizes for conservative counts:
+
+``` {r library cc, echo=FALSE}
+kable(dge_cc$samples[,-3])
+```
+
+We can then save the dge object we want to keep (in our case, conservative counts), using the following code:
+
+
+``` {r saving cc, echo=TRUE}
+setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects")
+
+    save(dge_cc, file = "dge_cc.xz" , compress="xz")
+```
+
 
