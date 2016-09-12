@@ -39,15 +39,9 @@ donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
 
 
-# For first 50 genes, see the distribution of counts:
-random_sample=sample(nrow(dge_cc),50)
-par(mfrow=c(1,2))
-plot(density(as.numeric(unlist(dge_cc$counts[random_sample,]))), main="counts", cex.main=2)
-plot(density(as.numeric(unlist(log2(dge_cc$counts+1)[random_sample,]))), main="log2", cex.main=2)
 
 
 ```
-I have plotted the untransformed and the log2 transformed counts for a random sample of 50 genes across the 24 samples. Most genes have ~1000 counts (log2=10).
 
 Our DGE object for conservative counts has `r nrow(dge_cc$counts)` genes. First I calculate the normalization factors using TMM.
 
@@ -94,20 +88,22 @@ For the linear model, I'll do a voom transformation. It uses the experiment desi
 v2=voom(dge_cc,design=design_iPSC,plot=TRUE)    #iPSC vs other stages
 # This converts the counts to log-counts per million with associated precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data.
 
-plot(log2(dge_cc$counts + 1)[,1:2],
-     pch=16, cex=0.3)
-plot(v2$E[,1:2],
-     pch=16, cex=0.3)
-
-
-library(vsn)
 par(mfrow=c(1,2))
+plot(log2(dge_cc$counts + 1)[,1:2],
+     pch=16, cex=0.3, main="log2")
+plot(v2$E[,1:2],
+     pch=16, cex=0.3, main=" voom norm counts")
 
-meanSdPlot(as.matrix(dge_cc$counts))
-meanSdPlot(as.matrix(log2(dge_cc$counts+1)))
+# For first 50 genes, see the distribution of counts:
+random_sample=sample(nrow(dge_cc),50)
+par(mfrow=c(1,3))
+plot(density(as.numeric(unlist(dge_cc$counts[random_sample,]))), main="counts", cex.main=2)
+plot(density(as.numeric(unlist(log2(dge_cc$counts+1)[random_sample,]))), main="log2", cex.main=2)
+plot(density(as.numeric(unlist(v2$E[random_sample,]))), main="voom norm counts", cex.main=2)
 
 
 ```
+I have plotted the untransformed and the log2 transformed counts for a random sample of 50 genes across the 24 samples. Most genes have ~1000 counts (log2=10). The count data follows a skewed distribution with a large dynamic range and a large tail of “extreme values” to the right of the distribution. Why do the voom transformed values have negative values, compared to the log2 transformed ones? The negative values should come from counts below 1, but they are higher.
 
 
 Including in the design matrix all stages:
@@ -242,6 +238,167 @@ plot_sdc=function(x){
 }
 
 sdc_voom=plot_sdc(v2$E) # I used the design v2, but it gives the same result with any other (depends on the expression values, v$E doesn't vary with design matrix)
+
+
+
+
+```
+
+Principal component analysis, similar to MDS:
+```{r pca, echo=FALSE, fig.width=7, fig.height=7}
+
+
+
+# tried for different designs: exactly the same
+par(mfrow=c(1,1))
+plot_pca=function(x,s=samples,st=stages){
+  pca1<-prcomp(t(x), retx=TRUE)
+  
+  plot(pca1, type = "l") #variance vs first 10 components
+  summary(pca1)          #importance of each component (important line is "proportion of variance")
+  
+  percentVar <- (pca1$sdev)^2 / sum(pca1$sdev^2)
+  percentVar <- round(100 * percentVar)
+  pcs <- as.data.frame(pca1$x)
+  pcs <- cbind(pcs,sample=samples,stage=stages)
+  pcs$stage <- ordered(pcs$stage, levels = stage)
+  
+  p <- ggplot(pcs, aes(PC1, PC2, colour=stage, shape=samples)) + 
+    geom_point(size = 3) + xlab (paste0( "PC1:" ,percentVar[ 1 ],"% variance")) + 
+    ylab (paste0( "PC2: ",percentVar[ 2 ],"% variance" ))
+  p <- p + theme(	panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+                  panel.background = element_blank(),
+                  panel.border = element_rect(fill = NA, colour = "black"), 
+                  legend.key = element_blank(),# legend.position = c(0.5,0.5),
+                  axis.title.y = element_text(face="bold", angle=90, size=12, vjust=0.2),
+                  axis.title.x = element_text(face="bold", size=12, vjust=0),
+                  axis.text.x = element_text(face="bold", colour = "black", angle=90, size=12, vjust=0.2, hjust =1 ),
+                  axis.text.y = element_text(face="bold", colour = "black"),
+                  axis.ticks = element_line(colour = "black"),
+                  axis.line = element_line(colour = "black"))
+  
+  return(p)
+}
+
+p=plot_pca(v2$E)
+p
+
+```
+
+Differential expression analysis:
+
+```{r DE, echo=FALSE, fig.width=7, fig.height=7}
+############# differential expression for all stages ################
+
+
+d=as.data.frame(design1)
+
+stagesDE=as.factor(c(0,0,0,1,1,1, rep(0,18)))  # add DE to design matrix, because the function to make it ignores this (is the baseline)
+d=cbind(d,stagesDE)
+d=d[c(1,2:8,11,9,10)] # re-order to loop through it without testing intercept or samples
+
+for (i in colnames(d[2:9])) {
+  
+    test=as.factor(d[,which(colnames(d)==i)]) 
+    design2=model.matrix(~samples+test)
+    v2=voom(dge_cc,design=design2,save.plot=TRUE) # voom normalize before fitting the linear model
+  
+  
+    name <- gsub("stages","",i)
+  
+  
+  
+      # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MVtrend",name,"vs_others.tiff"), type="cairo",
+      #  width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+      plot(v2$voom.xy, xlab = "log2( count size + 0.5 )", ylab = "Sqrt( standard deviation )", 
+       pch = 16, cex = 0.25)
+      title(paste("voom: Mean-variance trend:",i,"vs other stages"))
+      lines(v2$voom.line, col = "red")
+      # dev.off()
+      # 
+      
+  
+    #   #  After this, the usual limma pipelines for differential expression can be applied, for example:
+  
+   fit2 <- lmFit(v2,design2)
+   fit2 <- eBayes(fit2)
+   diff_exp=topTable(fit2,coef=ncol(design2),sort.by = "logFC",number=nrow(fit2$coefficients))
+  
+  # write.csv( diff_exp, file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/voom_results",name,"vs_others_differential_expression.csv",sep="_"))
+  kable(head(diff_exp))
+  
+  
+  
+  ################ keep writing from here
+  
+   plot_long=diff_exp[1:20,1:2]   # keep id and names to plot longitudinal variation of these top 20 genes 
+  
+   plot_long=tpm[match(plot_long$ensembl_gene_id,tpm$GeneID),]
+  
+  #order the columns by stage
+  
+  nc=plot_long[ , grepl( "iPSC" , names( plot_long ) ) ]  #takes columns whose name matches x
+  
+  #Do the same for the other stages
+  
+  for (s in stage[-1])  {         
+    
+    i= plot_long[ , grepl( s , names( plot_long ) ) ]
+    nc=cbind(nc,i)
+  }
+  
+  plot_long=cbind(plot_long[c(1:2)],nc)
+    rm(i,nc)
+  
+  
+  # melt data for ggplot2
+  
+    long = melt(plot_long, measure.vars = c(3:26))
+    head(long)
+    
+  # rename stages and samples
+    stage_2= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")  #shortening EN names
+    long$variable=rep(stage_2,each=60)
+    colnames(long)[which(names(long) == "variable")] <- "stage"
+    long$sample=rep(samples,each=20)
+    long$stage <- factor(long$stage, levels=stage_2)
+    long$sample=as.factor(long$sample)
+    
+    
+    # if(long_plots==TRUE){
+    # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_top20genes_long_plots",name,"vs_others.tiff",sep="_"), type="cairo",
+    #      width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+    # p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +
+    #   geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,scales="free")
+    # print(p)
+    # dev.off()
+    # }
+    
+    if(qc_plots==TRUE){
+    
+    # Volcano plot
+    tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_volcano_",name,"vs_others.tiff"), type="cairo",
+       width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+    volcanoplot(fit2,coef=ncol(design2),highlight=30,names=fit2$genes$external_gene_name,main=paste("Volcano plot(",name,"vs other stages)"))
+    dev.off()
+  
+    # Mean-difference plot
+    tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MD_",name,"vs_others.tiff"), type="cairo",
+       width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+    plotMD(fit2,coef=ncol(design2),status=fit2$p.value[,4]<0.001,main="Mean-difference plot",ylab = paste("log-fold change (",name,"vs other stages)"))
+    dev.off()
+  
+    # Q-Q plot of moderated t-statistics
+    tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_QQplot_mod_t_stats",name,"vs_others.tiff"), type="cairo",
+       width=10,height=8,units="in",res=300,pointsize = 13,compression="lzw") 
+    qqt(fit2$t[,4],df=fit2$df.residual+fit2$df.prior,main=paste("Q-Q plot of moderated t-statistics(",name,"vs other stages)"))  # careful to select the roght column in data
+    abline(0,1)
+    dev.off()
+  
+    }
+  
+  
+}   
 
 
 
