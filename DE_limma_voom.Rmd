@@ -39,7 +39,16 @@ donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
 
 
+# For first 50 genes, see the distribution of counts:
+random_sample=sample(nrow(dge_cc),50)
+par(mfrow=c(1,2))
+plot(density(as.numeric(unlist(dge_cc$counts[random_sample,]))), main="counts", cex.main=2)
+plot(density(as.numeric(unlist(log2(dge_cc$counts+1)[random_sample,]))), main="log2", cex.main=2)
+
+
 ```
+I have plotted the untransformed and the log2 transformed counts for a random sample of 50 genes across the 24 samples. Most genes have ~1000 counts (log2=10).
+
 Our DGE object for conservative counts has `r nrow(dge_cc$counts)` genes. First I calculate the normalization factors using TMM.
 
 ```{r normalization factors,echo=FALSE}
@@ -83,6 +92,19 @@ For the linear model, I'll do a voom transformation. It uses the experiment desi
 
 
 v2=voom(dge_cc,design=design_iPSC,plot=TRUE)    #iPSC vs other stages
+# This converts the counts to log-counts per million with associated precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data.
+
+plot(log2(dge_cc$counts + 1)[,1:2],
+     pch=16, cex=0.3)
+plot(v2$E[,1:2],
+     pch=16, cex=0.3)
+
+
+library(vsn)
+par(mfrow=c(1,2))
+
+meanSdPlot(as.matrix(dge_cc$counts))
+meanSdPlot(as.matrix(log2(dge_cc$counts+1)))
 
 
 ```
@@ -102,7 +124,7 @@ There is very high biological variation due to systematic differences between st
 Before fitting the linear model, I'll perform multi-dimensional scaling:  Plot samples on a two-dimensional scatterplot so that distances on the plot approximate the typical log2 fold changes between the samples (MDS).
 
 
-```{r mds, echo=FALSE, fig.width=7, fig.height=7,}
+```{r mds, echo=FALSE, fig.width=7, fig.height=7}
 
 #function wrap so that plotMDS doesn't produce a plot when called:
 plotMDS.invisible <- function(...){
@@ -197,3 +219,31 @@ plot(mds_plots[[2]])
 The distance between each pair of samples is the root-mean-square deviation (Euclidean distance) for the top genes. Distances on the plot can be interpreted as leading log2-fold-change, meaning the typical (root-mean-square) log2-fold-change between the samples for the genes that distinguish those samples. If gene.selection is "common", then the top genes are those with the largest standard deviations between samples. If gene.selection is "pairwise", then a different set of top genes is selected for each pair of samples. The pairwise feature selection may be appropriate for microarray data when different molecular pathways are relevant for distinguishing different pairs of samples. 
 
 In this case, we see for the "pairwise" method that EN stages cluster by stage (6 or 7) and not by sample. In the "common" method, the opposite happens. Nothing else changes much between the two plots. My interpretation is that the genes that drive the variance between all stages, that are used in the common method, are not the ones that distinguish the late EN stages. There is in reality for EN a much higher similarity between samples than between stages, and therefore the stages need to be separated by different genes (as shown in the pairwise method). Plotting the two versions shows us interesting information about the data. The "pairwise" method also shows that samples Ad2.1 and Neo1.1 are closer in EN stage 7 than sample Ad3.1. We saw from the longitudinal TPM plots of selected marker genes that sample Ad3.1 is better differentiated.
+
+Now I plot the sample distance cluster (see how this is different from MDS, and the meaning of the legend):
+
+```{r sdc, echo=FALSE, fig.width=7, fig.height=7}
+################## get sample distance cluster  ##################
+
+plot_sdc=function(x){
+  sampleDists <- dist(t(x))   
+  #This function computes and returns the distance matrix computed by using the specified distance measure to compute the distances between the rows of a data matrix.
+  # by default, "euclidean"
+  sampleDistMatrix <- as.matrix(sampleDists)
+  rownames(sampleDistMatrix) <- paste(stages, samples, sep="-")
+  colnames(sampleDistMatrix) <- NULL
+  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_Distance_clustering.tiff", type="cairo",
+  # width=10,height=8,units="in",res=300,pointsize = 13,compression="lzw") 
+  sdc= pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors)
+  # dev.off()
+  
+  return(sdc)
+}
+
+sdc_voom=plot_sdc(v2$E) # I used the design v2, but it gives the same result with any other (depends on the expression values, v$E doesn't vary with design matrix)
+
+
+
+
+```
