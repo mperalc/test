@@ -27,11 +27,12 @@ library(ggplot2)
 library(ggfortify)
 library(reshape2)  # to modify dataframes for ggplot2
 library(knitr)   #for tables in rmd
+library(pander)  #more tables
+library(readr) # fast reading of large files
 
 
-setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects")
 
-load(file="dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
+load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
 
 
 donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
@@ -103,14 +104,14 @@ plot(density(as.numeric(unlist(v2$E[random_sample,]))), main="voom norm counts",
 
 
 ```
-I have plotted the untransformed and the log2 transformed counts for a random sample of 50 genes across the 24 samples. Most genes have ~1000 counts (log2=10). The count data follows a skewed distribution with a large dynamic range and a large tail of “extreme values” to the right of the distribution. Why do the voom transformed values have negative values, compared to the log2 transformed ones? The negative values should come from counts below 1, but they are higher.
+I have plotted the untransformed and the log2 transformed counts for a random sample of 50 genes across the 24 samples. Most genes have ~1000 counts (log2=10). The count data follows a skewed distribution with a large dynamic range and a large tail of “extreme values” to the right of the distribution. The voom transformed values have negative values, compared to the log2 transformed ones, because it transforms to log2 of cpm. If we transform our counts to cpm and then log2 we see very similar numbers.
 
 
 Including in the design matrix all stages:
 
 ```{r voom normalization all, echo=FALSE}
 
-
+par(mfrow=c(1,1))
 v1=voom(dge_cc,design=design1,plot=TRUE)  #with all samples and stages
 
 ```
@@ -287,7 +288,7 @@ p
 
 Differential expression analysis:
 
-```{r DE, echo=FALSE, fig.width=7, fig.height=7}
+```{r DE, echo=FALSE, fig.width=9, fig.height=9}
 ############# differential expression for all stages ################
 
 
@@ -295,7 +296,7 @@ d=as.data.frame(design1)
 
 stagesDE=as.factor(c(0,0,0,1,1,1, rep(0,18)))  # add DE to design matrix, because the function to make it ignores this (is the baseline)
 d=cbind(d,stagesDE)
-d=d[c(1,2:8,11,9,10)] # re-order to loop through it without testing intercept or samples
+d=d[c(1,5,11,8,7,6,4,2,3)] # re-order to loop through it without testing intercept or samples
 
 for (i in colnames(d[2:9])) {
   
@@ -312,92 +313,171 @@ for (i in colnames(d[2:9])) {
       #  width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
       plot(v2$voom.xy, xlab = "log2( count size + 0.5 )", ylab = "Sqrt( standard deviation )", 
        pch = 16, cex = 0.25)
-      title(paste("voom: Mean-variance trend:",i,"vs other stages"))
+      title(paste("voom: Mean-variance trend -",name,"vs other stages",sep=" "))
       lines(v2$voom.line, col = "red")
       # dev.off()
       # 
       
   
     #   #  After this, the usual limma pipelines for differential expression can be applied, for example:
+      
   
    fit2 <- lmFit(v2,design2)
    fit2 <- eBayes(fit2)
    diff_exp=topTable(fit2,coef=ncol(design2),sort.by = "logFC",number=nrow(fit2$coefficients))
   
+   
+   
   # write.csv( diff_exp, file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/voom_results",name,"vs_others_differential_expression.csv",sep="_"))
-  kable(head(diff_exp))
+   
+   row.names(diff_exp) <- NULL
+   
+   
+   set.caption(paste("Differential expression results: top logFC for",name,sep=" "))
+   pandoc.table(head(diff_exp[-1]),split.table = Inf)
+   
+   
   
+  ######### with p-values <0.05
+   
+
+  diff_exp_sig=diff_exp[which(diff_exp$adj.P.Val<0.05),]
   
+  print(paste("There are", nrow(diff_exp_sig),"significantly differentially expressed genes for",name))
   
-  ################ keep writing from here
+   fit2.treat1 <- decideTests(fit2)   # this states which genes are DE with increased expression (row 1) or decreased expression (row -1)
+   
+   summary.fit2=summary(fit2.treat1)
+   
+   summary.fit2=summary.fit2[,4]
   
-   plot_long=diff_exp[1:20,1:2]   # keep id and names to plot longitudinal variation of these top 20 genes 
+   set.caption(paste("Differential expression results: number of significant DE genes for",name))
+   pandoc.table(summary.fit2)
   
-   plot_long=tpm[match(plot_long$ensembl_gene_id,tpm$GeneID),]
-  
-  #order the columns by stage
-  
-  nc=plot_long[ , grepl( "iPSC" , names( plot_long ) ) ]  #takes columns whose name matches x
-  
-  #Do the same for the other stages
-  
-  for (s in stage[-1])  {         
+   
+
+   tpm=as.data.frame(read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/other_counts/27.07.2016.Differentiation_v2.gene.tpm.tsv"))   # read tpm file for plotting   longitudinal tpm data
+   tpm$GeneID <- gsub("(ENSG[0-9]+).*", "\\1", tpm$GeneID) # cut everything after the dot
+   
+   #order the columns by stage
+     order_by_stage=function(x,.stage=stage){
+       
+       nc=x[ , grepl( "iPSC" , names( x ) ) ]  #takes columns whose name matches x
+       
+       #Do the same for the other stages
+       
+       for (s in stage[-1])  {         
+         
+         i= x[ , grepl( s , names( x ) ) ]
+         nc=cbind(nc,i)
+       }
+       
+       x=cbind(x[c(1:2)],nc)
+       return(x)
+     }
+
+   make_long_plots=function(y,.tpm=tpm,.samples=samples,n=9){
+     
+     plot_long=y[1:n,1:2]   # keep id and names to plot longitudinal variation of these top n genes 
+     
+     plot_long=tpm[match(plot_long$ensembl_gene_id,tpm$GeneID),]
+     
+     
+     
+     plot_long=order_by_stage(plot_long)
+     
+     # melt data for ggplot2
+     
+     long = melt(plot_long, measure.vars = c(3:26))
+     
+     
+     # rename stages and samples
+     stage_2= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")  #shortening EN names
+     long$variable=rep(stage_2,each=n*3)
+     colnames(long)[which(names(long) == "variable")] <- "stage"
+     long$sample=rep(samples,each=n)
+     long$stage <- factor(long$stage, levels=stage_2)
+     long$sample=as.factor(long$sample)
+     
+     
+     # if(long_plots==TRUE){
+     # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_top20genes_long_plots",name,"vs_others.tiff",sep="_"), type="cairo",
+     #      width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+     p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +ylab("transcript per million")  +
+       geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes:",name,"vs other stages")) +
+     theme( axis.text.x  = element_text(angle=60, vjust=0.5, size=12))
+     return(p)
+   }
+   
+   p=make_long_plots(diff_exp_sig)
+   print(p)
     
-    i= plot_long[ , grepl( s , names( plot_long ) ) ]
-    nc=cbind(nc,i)
-  }
-  
-  plot_long=cbind(plot_long[c(1:2)],nc)
-    rm(i,nc)
-  
-  
-  # melt data for ggplot2
-  
-    long = melt(plot_long, measure.vars = c(3:26))
-    head(long)
-    
-  # rename stages and samples
-    stage_2= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")  #shortening EN names
-    long$variable=rep(stage_2,each=60)
-    colnames(long)[which(names(long) == "variable")] <- "stage"
-    long$sample=rep(samples,each=20)
-    long$stage <- factor(long$stage, levels=stage_2)
-    long$sample=as.factor(long$sample)
-    
-    
-    # if(long_plots==TRUE){
-    # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_top20genes_long_plots",name,"vs_others.tiff",sep="_"), type="cairo",
-    #      width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
-    # p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +
-    #   geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,scales="free")
-    # print(p)
     # dev.off()
     # }
     
-    if(qc_plots==TRUE){
+  
     
     # Volcano plot
-    tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_volcano_",name,"vs_others.tiff"), type="cairo",
-       width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
-    volcanoplot(fit2,coef=ncol(design2),highlight=30,names=fit2$genes$external_gene_name,main=paste("Volcano plot(",name,"vs other stages)"))
-    dev.off()
+   # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_volcano_",name,"vs_others.tiff"), type="cairo",
+     #  width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+    volcanoplot(fit2,coef=ncol(design2),highlight=10,names=fit2$genes$external_gene_name,main=paste("Volcano plot:",name,"vs other stages"))
+   # dev.off()
   
-    # Mean-difference plot
-    tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MD_",name,"vs_others.tiff"), type="cairo",
-       width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
-    plotMD(fit2,coef=ncol(design2),status=fit2$p.value[,4]<0.001,main="Mean-difference plot",ylab = paste("log-fold change (",name,"vs other stages)"))
-    dev.off()
+   
   
-    # Q-Q plot of moderated t-statistics
-    tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_QQplot_mod_t_stats",name,"vs_others.tiff"), type="cairo",
-       width=10,height=8,units="in",res=300,pointsize = 13,compression="lzw") 
-    qqt(fit2$t[,4],df=fit2$df.residual+fit2$df.prior,main=paste("Q-Q plot of moderated t-statistics(",name,"vs other stages)"))  # careful to select the roght column in data
+
+    
+    # Let's decide that we are only interested in genes that have above absolute logFC of 1.
+    # This corresponds to a fold change of 2, or 0.5 (i.e. double or half).
+    # We can perform a treat analysis which ranks our genes according to p-value AND logFC.
+    # This is easy to do after our analysis, we just give the treat function the fit object and specify our cut-off.
+    fit2.logfc1 <- treat(fit2,lfc=1)
+    fit2.treat2 <- decideTests(fit2.logfc1)
+    summary.fit2fc1=summary(fit2.treat2)
+    
+    
+    set.caption(paste("Differential expression results: number of significant DE genes with logFC>1 for ",name))
+    pandoc.table(summary.fit2fc1[,4])
+    
+    diff_exp.logfc1=topTable(fit2.logfc1,coef=ncol(design2),sort.by = "logFC",number=nrow(fit2.logfc1$coefficients))
+    diff_exp.logfc1_sig=diff_exp.logfc1[which(diff_exp.logfc1$adj.P.Val<0.05),]
+    
+    
+   # write.csv(diff_exp.logfc1_sig, file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/voom_results",name,"vs_others_DEA_sign_above_logFC1.csv",sep="_"))
+    
+     # Mean-difference plot
+   # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MD_",name,"vs_others.tiff"), type="cairo",
+     #  width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+    
+  
+  
+    plotMD(fit2,coef=ncol(design2),status=fit2$genes$ensembl_gene_id %in% diff_exp.logfc1_sig$ensembl_gene_id,main=paste("Mean-difference plot:",name,"vs other stages"),ylab = "log-fold change")
+    
+     # dev.off()
+    
+     print("In red, genes with logFC>1 that are significantly differentially expressed")
+    
+    
+    # Q-Q plot of moderated t-statistics. Points off the line may be differentially expressed
+   
+    # colour significant genes that have log2FC>1 in red
+    
+    datap=as.data.frame(fit2$genes)
+    datap$Colour="black"
+    # Set new column values to appropriate colours
+    datap$Colour[fit2$genes$ensembl_gene_id %in% diff_exp.logfc1_sig$ensembl_gene_id]="red"
+  
+    
+    # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_QQplot_mod_t_stats",name,"vs_others.tiff"), type="cairo",
+    #   width=10,height=8,units="in",res=300,pointsize = 13,compression="lzw") 
+   qqt(fit2$t[,4],df=fit2$df.total,col=datap$Colour,main=paste("Q-Q plot of moderated t-statistics:",name,"vs other stages"))  # careful to select the roght
+  # column in data
     abline(0,1)
-    dev.off()
+    #dev.off()
+    
+    print("In red, genes with logFC>1 that are significantly differentially expressed")
   
-    }
-  
-  
+    
 }   
 
 
