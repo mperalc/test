@@ -71,6 +71,9 @@ The base in the design matrix is sample 1 for the samples, and DE for the stages
 
 ```{r simple design matrix, echo=FALSE}
 
+
+# check from here 
+
 d=as.data.frame(design1)
 test_iPSc=as.factor(d$stagesiPSC)    # for iPSC. Here I am testing 1 stage (with all samples) vs all the other stages
 
