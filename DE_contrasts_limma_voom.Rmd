@@ -39,6 +39,43 @@ donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
 
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
 
+# order by samples, to make the design matrix clearer:
+
+
+order_by_samples=function(x,donors.= donors){
+nc=x[ , grepl( "Ad2.1" , names( x) ) ]  #takes columns whose name matches x
+
+#Do the same for the other stages
+
+for (s in donors.[-1])  {         
+  
+  i= x[ , grepl( s , names( x ) ) ]
+  nc=cbind(nc,i)
+}
+
+return(nc)
+}
+
+dge_cc$counts=order_by_samples(dge_cc$counts)
+
+#same with sample matrix from dge:
+
+
+order_by_samples2=function(x,donors.= donors){
+nc=x[ grep( "Ad2.1" , rownames( x) ), ]  #takes columns whose name matches x
+
+#Do the same for the other stages
+
+for (s in donors.[-1])  {         
+  
+  i= x[ grep( s , rownames( x ) ), ]
+  nc=rbind(nc,i)
+}
+
+return(nc)
+}
+
+dge_cc$samples=order_by_samples2(dge_cc$samples)
 
 
 
@@ -59,29 +96,27 @@ Now I'll create the design matrix.
 
 ```{r design matrix, echo=FALSE}
  
-samples <- c(rep(c("sample1","sample2","sample3"),8))   # create the design matrix
+samples <- c(rep(c("sample1","sample2","sample3"),each=8))   # create the design matrix
 samples=as.factor(samples)
-stages <-rep(stage,each=3) 
+#stages <-rep(stage,each=3) 
+stages <- c(rep(1:8,3))
 stages <- as.factor(stages)
 design1 <- model.matrix(~stages + samples)                    
 kable(design1)
+# Now it looks like a normal design matrix, ready to create the contrast matrix
+```
+This is the design matrix. The base in the design matrix is sample 1 for the samples, and iPSC for the stages (they don't appear on the design matrix because it has all the information now about all the samples and stages). 
+
+The contrast matrix looks like this:
+
+```{r contrast matrix, echo=FALSE}
+contrast.matrix= rbind(0,diag(7),0,0)
+print(contrast.matrix)
+
 ```
 
-The base in the design matrix is sample 1 for the samples, and DE for the stages (they don't appear on the design matrix because it has all the information now about all the samples and stages). This design matrix has the information for every stage. But if I want to test 1 stage vs all others, I could create from that a simplified matrix. For example, for iPSC:
+The base in the design matrix is sample 1 for the samples, and iPSC for the stages (they don't appear on the design matrix because it has all the information now about all the samples and stages). 
 
-```{r simple design matrix, echo=FALSE}
-
-
-# check from here 
-
-d=as.data.frame(design1)
-test_iPSc=as.factor(d$stagesiPSC)    # for iPSC. Here I am testing 1 stage (with all samples) vs all the other stages
-
-design_iPSC=model.matrix(~samples+test_iPSc)
-
-kable(design_iPSC)
-
-```
 
 For the linear model, I'll do a voom transformation. It uses the experiment design matrix, and produces an EList object using normalised data to convert the read counts to log2-cpm, with associated weights, ready for linear modelling.The limma-voom method assumes that rows with zero or very low counts have been removed. For design matrix with iPSC only:
 
@@ -89,7 +124,7 @@ For the linear model, I'll do a voom transformation. It uses the experiment desi
 ```{r voom normalization, echo=FALSE}
 
 
-v2=voom(dge_cc,design=design_iPSC,plot=TRUE)    #iPSC vs other stages
+v2=voom(dge_cc,design=design1,plot=TRUE)   
 # This converts the counts to log-counts per million with associated precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data.
 
 par(mfrow=c(1,2))
@@ -109,18 +144,6 @@ plot(density(as.numeric(unlist(v2$E[random_sample,]))), main="voom norm counts",
 ```
 I have plotted the untransformed and the log2 transformed counts for a random sample of 50 genes across the 24 samples. Most genes have ~1000 counts (log2=10). The count data follows a skewed distribution with a large dynamic range and a large tail of “extreme values” to the right of the distribution. The voom transformed values have negative values, compared to the log2 transformed ones, because it transforms to log2 of cpm. If we transform our counts to cpm and then log2 we see very similar numbers.
 
-
-Including in the design matrix all stages:
-
-```{r voom normalization all, echo=FALSE}
-
-par(mfrow=c(1,1))
-v1=voom(dge_cc,design=design1,plot=TRUE)  #with all samples and stages
-
-```
-
-
-There is very high biological variation due to systematic differences between stages and samples. Why is the variation lower than with just one stage?
 Before fitting the linear model, I'll perform multi-dimensional scaling:  Plot samples on a two-dimensional scatterplot so that distances on the plot approximate the typical log2 fold changes between the samples (MDS).
 
 
@@ -140,7 +163,7 @@ pretty_mds=function(v2){
   mds_p=plotMDS.invisible(v2$E,gene.selection = "pairwise")    # pairwise method (default)
   mds_c=plotMDS.invisible(v2$E,gene.selection = "common")      #common method 
   
-  
+  stages <-rep(stage,each=3) 
   # Rearrange data for ggplot
   
   # method: pairwise
@@ -220,7 +243,7 @@ The distance between each pair of samples is the root-mean-square deviation (Euc
 
 In this case, we see for the "pairwise" method that EN stages cluster by stage (6 or 7) and not by sample. In the "common" method, the opposite happens. Nothing else changes much between the two plots. My interpretation is that the genes that drive the variance between all stages, that are used in the common method, are not the ones that distinguish the late EN stages. There is in reality for EN a much higher similarity between samples than between stages, and therefore the stages need to be separated by different genes (as shown in the pairwise method). Plotting the two versions shows us interesting information about the data. The "pairwise" method also shows that samples Ad2.1 and Neo1.1 are closer in EN stage 7 than sample Ad3.1. We saw from the longitudinal TPM plots of selected marker genes that sample Ad3.1 is better differentiated.
 
-Now I plot the sample distance cluster (see how this is different from MDS, and the meaning of the legend):
+Now I plot the sample distance cluster (look for the meaning of the legend):
 
 ```{r sdc, echo=FALSE, fig.width=7, fig.height=7}
 ################## get sample distance cluster  ##################
@@ -230,6 +253,7 @@ plot_sdc=function(x){
   #This function computes and returns the distance matrix computed by using the specified distance measure to compute the distances between the rows of a data matrix.
   # by default, "euclidean"
   sampleDistMatrix <- as.matrix(sampleDists)
+  stages <-rep(stage,each=3) 
   rownames(sampleDistMatrix) <- paste(stages, samples, sep="-")
   colnames(sampleDistMatrix) <- NULL
   colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
@@ -241,7 +265,7 @@ plot_sdc=function(x){
   return(sdc)
 }
 
-sdc_voom=plot_sdc(v2$E) # I used the design v2, but it gives the same result with any other (depends on the expression values, v$E doesn't vary with design matrix)
+sdc_voom=plot_sdc(v2$E) 
 
 
 
@@ -255,6 +279,7 @@ Principal component analysis, similar to MDS:
 
 # tried for different designs: exactly the same
 par(mfrow=c(1,1))
+stages <-rep(stage,each=3) 
 plot_pca=function(x,s=samples,st=stages){
   pca1<-prcomp(t(x), retx=TRUE)
   
@@ -294,196 +319,40 @@ Differential expression analysis:
 ```{r DE, echo=FALSE, fig.width=9, fig.height=9}
 ############# differential expression for all stages ################
 
-
-d=as.data.frame(design1)
-
-stagesDE=as.factor(c(0,0,0,1,1,1, rep(0,18)))  # add DE to design matrix, because the function to make it ignores this (is the baseline)
-d=cbind(d,stagesDE)
-d=d[c(1,5,11,8,7,6,4,2,3)] # re-order to loop through it without testing intercept or samples
-
-for (i in colnames(d[2:9])) {
-  
-    test=as.factor(d[,which(colnames(d)==i)]) 
-    design2=model.matrix(~samples+test)
-    v2=voom(dge_cc,design=design2,save.plot=TRUE) # voom normalize before fitting the linear model
-  
-  
-    name <- gsub("stages","",i)
-  
-  
-  
-      # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MVtrend",name,"vs_others.tiff"), type="cairo",
-      #  width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
-      plot(v2$voom.xy, xlab = "log2( count size + 0.5 )", ylab = "Sqrt( standard deviation )", 
-       pch = 16, cex = 0.25)
-      title(paste("voom: Mean-variance trend -",name,"vs other stages",sep=" "))
-      lines(v2$voom.line, col = "red")
-      # dev.off()
-      # 
-      
-  
-    #   #  After this, the usual limma pipelines for differential expression can be applied, for example:
-      
-  
-   fit2 <- lmFit(v2,design2)
-   fit2 <- eBayes(fit2)
-   diff_exp=topTable(fit2,coef=ncol(design2),sort.by = "logFC",number=nrow(fit2$coefficients))
-  
-   
-   
-  # write.csv( diff_exp, file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/voom_results",name,"vs_others_differential_expression.csv",sep="_"))
-   
-   row.names(diff_exp) <- NULL
-   
-   
-   set.caption(paste("Differential expression results: top logFC for",name,sep=" "))
-   pandoc.table(head(diff_exp[-1]),split.table = Inf)
-   
-   
-  
-  ######### with p-values <0.05
-   
-
-  diff_exp_sig=diff_exp[which(diff_exp$adj.P.Val<0.05),]
-  
-  print(paste("There are", nrow(diff_exp_sig),"significantly differentially expressed genes for",name))
-  
-   fit2.treat1 <- decideTests(fit2)   # this states which genes are DE with increased expression (row 1) or decreased expression (row -1)
-   
-   summary.fit2=summary(fit2.treat1)
-   
-   summary.fit2=summary.fit2[,4]
-  
-   set.caption(paste("Differential expression results: number of significant DE genes for",name))
-   pandoc.table(summary.fit2)
-  
-   
-
-   tpm=as.data.frame(read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/other_counts/27.07.2016.Differentiation_v2.gene.tpm.tsv"))   # read tpm file for plotting   longitudinal tpm data
-   tpm$GeneID <- gsub("(ENSG[0-9]+).*", "\\1", tpm$GeneID) # cut everything after the dot
-   
-   #order the columns by stage
-     order_by_stage=function(x,.stage=stage){
-       
-       nc=x[ , grepl( "iPSC" , names( x ) ) ]  #takes columns whose name matches x
-       
-       #Do the same for the other stages
-       
-       for (s in stage[-1])  {         
-         
-         i= x[ , grepl( s , names( x ) ) ]
-         nc=cbind(nc,i)
-       }
-       
-       x=cbind(x[c(1:2)],nc)
-       return(x)
-     }
-
-   make_long_plots=function(y,.tpm=tpm,.samples=samples,n=9){
-     
-     plot_long=y[1:n,1:2]   # keep id and names to plot longitudinal variation of these top n genes 
-     
-     plot_long=tpm[match(plot_long$ensembl_gene_id,tpm$GeneID),]
-     
-     
-     
-     plot_long=order_by_stage(plot_long)
-     
-     # melt data for ggplot2
-     
-     long = melt(plot_long, measure.vars = c(3:26))
-     
-     
-     # rename stages and samples
-     stage_2= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")  #shortening EN names
-     long$variable=rep(stage_2,each=n*3)
-     colnames(long)[which(names(long) == "variable")] <- "stage"
-     long$sample=rep(samples,each=n)
-     long$stage <- factor(long$stage, levels=stage_2)
-     long$sample=as.factor(long$sample)
-     
-     
-     # if(long_plots==TRUE){
-     # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_top20genes_long_plots",name,"vs_others.tiff",sep="_"), type="cairo",
-     #      width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
-     p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +ylab("transcript per million")  +
-       geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes:",name,"vs other stages")) +
-     theme( axis.text.x  = element_text(angle=60, vjust=0.5, size=12))
-     return(p)
-   }
-   
-   p=make_long_plots(diff_exp_sig)
-   print(p)
-    
-    # dev.off()
-    # }
-    
-  
-    
-    # Volcano plot
-   # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_volcano_",name,"vs_others.tiff"), type="cairo",
-     #  width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
-    volcanoplot(fit2,coef=ncol(design2),highlight=10,names=fit2$genes$external_gene_name,main=paste("Volcano plot:",name,"vs other stages"))
-   # dev.off()
-  
-   
-  
-
-    
-    # Let's decide that we are only interested in genes that have above absolute logFC of 1.
-    # This corresponds to a fold change of 2, or 0.5 (i.e. double or half).
-    # We can perform a treat analysis which ranks our genes according to p-value AND logFC.
-    # This is easy to do after our analysis, we just give the treat function the fit object and specify our cut-off.
-    fit2.logfc1 <- treat(fit2,lfc=1)
-    fit2.treat2 <- decideTests(fit2.logfc1)
-    summary.fit2fc1=summary(fit2.treat2)
-    
-    
-    set.caption(paste("Differential expression results: number of significant DE genes with logFC>1 for ",name))
-    pandoc.table(summary.fit2fc1[,4])
-    
-    diff_exp.logfc1=topTable(fit2.logfc1,coef=ncol(design2),sort.by = "logFC",number=nrow(fit2.logfc1$coefficients))
-    diff_exp.logfc1_sig=diff_exp.logfc1[which(diff_exp.logfc1$adj.P.Val<0.05),]
-    
-    
-   # write.csv(diff_exp.logfc1_sig, file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/voom_results",name,"vs_others_DEA_sign_above_logFC1.csv",sep="_"))
-    
-     # Mean-difference plot
-   # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MD_",name,"vs_others.tiff"), type="cairo",
-     #  width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
-    
-  
-  
-    plotMD(fit2,coef=ncol(design2),status=fit2$genes$ensembl_gene_id %in% diff_exp.logfc1_sig$ensembl_gene_id,main=paste("Mean-difference plot:",name,"vs other stages"),ylab = "log-fold change")
-    
-     # dev.off()
-    
-     print("In red, genes with logFC>1 that are significantly differentially expressed")
-    
-    
-    # Q-Q plot of moderated t-statistics. Points off the line may be differentially expressed
-   
-    # colour significant genes that have log2FC>1 in red
-    
-    datap=as.data.frame(fit2$genes)
-    datap$Colour="black"
-    # Set new column values to appropriate colours
-    datap$Colour[fit2$genes$ensembl_gene_id %in% diff_exp.logfc1_sig$ensembl_gene_id]="red"
-  
-    
-    # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_QQplot_mod_t_stats",name,"vs_others.tiff"), type="cairo",
-    #   width=10,height=8,units="in",res=300,pointsize = 13,compression="lzw") 
-   qqt(fit2$t[,4],df=fit2$df.total,col=datap$Colour,main=paste("Q-Q plot of moderated t-statistics:",name,"vs other stages"))  # careful to select the roght
-  # column in data
-    abline(0,1)
-    #dev.off()
-    
-    print("In red, genes with logFC>1 that are significantly differentially expressed")
-  
-    
-}   
+fit = lmFit(v2,design1)
+fit2 = contrasts.fit(fit, contrast.matrix)
+fit2 = eBayes(fit2)
+alltable <- topTable(fit2, sort="F", number=nrow(dge_cc$counts))
 
 
 
+write.table(alltable,quote=F,row.names=F,sep="\t",file="230916_diff_expression_results.tsv")
+
+#get max conditions per gene
+maxVals <- apply(alltable,1,function(x) which.max(x[5:11]))
+
+#find significant genes per stage
+#iPSC stage are all those where the max coefficient in all is < 0
+sig_iPSC_stage <- alltable[rowSums(alltable[,5:11] < 0) == 7 & alltable$adj.P.Val < 0.01,]
+sig_DE_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 1,]
+sig_PGT_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 2,]
+sig_PFG_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 3,]
+sig_PE_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 4,]
+sig_EP_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 5,]
+sig_EN6_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 6,]
+sig_EN7_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 7,]
+
+
+write.table(sig_iPSC_stage,quote=F,row.names=F,sep="\t",file="230916_sig_iPSC_diff_expression_results.tsv")
+write.table(sig_DE_stage,quote=F,row.names=F,sep="\t",file="230916_sig_DE_diff_expression_results.tsv")
+write.table(sig_PGT_stage,quote=F,row.names=F,sep="\t",file="230916_sig_PGT_diff_expression_results.tsv")
+write.table(sig_PFG_stage,quote=F,row.names=F,sep="\t",file="230916_sig_PFG_diff_expression_results.tsv")
+write.table(sig_PE_stage,quote=F,row.names=F,sep="\t",file="230916_sig_PE_diff_expression_results.tsv")
+write.table(sig_EP_stage,quote=F,row.names=F,sep="\t",file="230916_sig_EP_diff_expression_results.tsv")
+write.table(sig_EN6_stage,quote=F,row.names=F,sep="\t",file="230916_sig_EN6_diff_expression_results.tsv")
+write.table(sig_EN7_stage,quote=F,row.names=F,sep="\t",file="230916_sig_EN7_diff_expression_results.tsv")
+
+# nothing is significant
+# problem of design matrix or contrasts matrix??
 
 ```
