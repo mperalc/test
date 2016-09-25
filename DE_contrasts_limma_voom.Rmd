@@ -17,6 +17,8 @@ I start loading the dge object for conservative counts.
 ```{r initial,echo=FALSE}
 
 
+#check everything! plots are wrong
+
 library(pheatmap)
 library(RColorBrewer)
 library(org.Hs.eg.db)
@@ -275,6 +277,8 @@ sdc_voom=plot_sdc(v2$E)
 Principal component analysis, similar to MDS:
 ```{r pca, echo=FALSE, fig.width=7, fig.height=7}
 
+
+# this gives the wrong result
 
 
 # tried for different designs: exactly the same
