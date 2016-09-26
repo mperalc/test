@@ -165,7 +165,7 @@ pretty_mds=function(v2){
   mds_p=plotMDS.invisible(v2$E,gene.selection = "pairwise")    # pairwise method (default)
   mds_c=plotMDS.invisible(v2$E,gene.selection = "common")      #common method 
   
-  stages <-rep(stage,each=3) 
+  stages <-rep(stage,3) 
   # Rearrange data for ggplot
   
   # method: pairwise
@@ -255,7 +255,7 @@ plot_sdc=function(x){
   #This function computes and returns the distance matrix computed by using the specified distance measure to compute the distances between the rows of a data matrix.
   # by default, "euclidean"
   sampleDistMatrix <- as.matrix(sampleDists)
-  stages <-rep(stage,each=3) 
+  stages <-rep(stage,3) 
   rownames(sampleDistMatrix) <- paste(stages, samples, sep="-")
   colnames(sampleDistMatrix) <- NULL
   colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
@@ -283,7 +283,7 @@ Principal component analysis, similar to MDS:
 
 # tried for different designs: exactly the same
 par(mfrow=c(1,1))
-stages <-rep(stage,each=3) 
+stages <-rep(stage,3) 
 plot_pca=function(x,s=samples,st=stages){
   pca1<-prcomp(t(x), retx=TRUE)
   
@@ -330,7 +330,7 @@ alltable <- topTable(fit2, sort="F", number=nrow(dge_cc$counts))
 
 
 
-write.table(alltable,quote=F,row.names=F,sep="\t",file="230916_diff_expression_results.tsv")
+write.csv(alltable,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_diff_expression_results.csv")
 
 #get max conditions per gene
 maxVals <- apply(alltable,1,function(x) which.max(x[5:11]))
@@ -347,16 +347,15 @@ sig_EN6_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val 
 sig_EN7_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 7,]
 
 
-write.table(sig_iPSC_stage,quote=F,row.names=F,sep="\t",file="230916_sig_iPSC_diff_expression_results.tsv")
-write.table(sig_DE_stage,quote=F,row.names=F,sep="\t",file="230916_sig_DE_diff_expression_results.tsv")
-write.table(sig_PGT_stage,quote=F,row.names=F,sep="\t",file="230916_sig_PGT_diff_expression_results.tsv")
-write.table(sig_PFG_stage,quote=F,row.names=F,sep="\t",file="230916_sig_PFG_diff_expression_results.tsv")
-write.table(sig_PE_stage,quote=F,row.names=F,sep="\t",file="230916_sig_PE_diff_expression_results.tsv")
-write.table(sig_EP_stage,quote=F,row.names=F,sep="\t",file="230916_sig_EP_diff_expression_results.tsv")
-write.table(sig_EN6_stage,quote=F,row.names=F,sep="\t",file="230916_sig_EN6_diff_expression_results.tsv")
-write.table(sig_EN7_stage,quote=F,row.names=F,sep="\t",file="230916_sig_EN7_diff_expression_results.tsv")
+write.csv(sig_iPSC_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_iPSC_diff_expression_results.csv")
+write.csv(sig_DE_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_DE_diff_expression_results.csv")
+write.csv(sig_PGT_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_PGT_diff_expression_results.csv")
+write.csv(sig_PFG_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_PFG_diff_expression_results.csv")
+write.csv(sig_PE_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_PE_diff_expression_results.csv")
+write.csv(sig_EP_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_EP_diff_expression_results.csv")
+write.csv(sig_EN6_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_EN6_diff_expression_results.csv")
+write.csv(sig_EN7_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_EN7_diff_expression_results.csv")
 
-# nothing is significant
-# problem of design matrix or contrasts matrix??
+
 
 ```
