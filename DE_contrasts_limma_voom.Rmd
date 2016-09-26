@@ -436,7 +436,7 @@ write.csv(sig_EN7_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/D
        geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes:",name)) +
      theme( axis.text.x  = element_text(angle=60, vjust=0.5, size=12))
      
-     ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/contrasts/with_correlation/Diff_v2_top9genes_long_plots",name,sep="_"),p,compression="lzw")
+     ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/contrasts/with_correlations/Diff_v2_top9genes_long_plots",name,".jpg",sep="_"),p,width=8,height=8,units="in",dpi=300)
    
      
      return(p)
@@ -455,8 +455,6 @@ write.csv(sig_EN7_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/D
     
      
      
-     
-  dev.off()
   
   
   
