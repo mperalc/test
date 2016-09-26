@@ -344,14 +344,14 @@ Differential expression analysis:
 ```{r DE, echo=FALSE, fig.width=9, fig.height=9}
 ############# differential expression for all stages ################
 
-fit = lmFit(v2,design1)
+fit = lmFit(v2,design1,block=sample_info$samples,correlation = dupcor_sample$consensus.correlation)
 fit2 = contrasts.fit(fit, contrast.matrix)
 fit2 = eBayes(fit2)
 alltable <- topTable(fit2, sort="F", number=nrow(dge_cc$counts))
 
 
 
-write.csv(alltable,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_diff_expression_results.csv")
+write.csv(alltable,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_diff_expression_results_with_correlations.csv")
 
 #get max conditions per gene
 maxVals <- apply(alltable,1,function(x) which.max(x[5:11]))
@@ -368,15 +368,97 @@ sig_EN6_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val 
 sig_EN7_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 7,]
 
 
-write.csv(sig_iPSC_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_iPSC_diff_expression_results.csv")
-write.csv(sig_DE_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_DE_diff_expression_results.csv")
-write.csv(sig_PGT_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_PGT_diff_expression_results.csv")
-write.csv(sig_PFG_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_PFG_diff_expression_results.csv")
-write.csv(sig_PE_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_PE_diff_expression_results.csv")
-write.csv(sig_EP_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_EP_diff_expression_results.csv")
-write.csv(sig_EN6_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_EN6_diff_expression_results.csv")
-write.csv(sig_EN7_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/260916_sig_EN7_diff_expression_results.csv")
+write.csv(sig_iPSC_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_sig_iPSC_diff_expression_results_with_correlations.csv")
+write.csv(sig_DE_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_sig_DE_diff_expression_results_with_correlations.csv")
+write.csv(sig_PGT_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_sig_PGT_diff_expression_results_with_correlations.csv")
+write.csv(sig_PFG_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_sig_PFG_diff_expression_results_with_correlations.csv")
+write.csv(sig_PE_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_sig_PE_diff_expression_results_with_correlations.csv")
+write.csv(sig_EP_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_sig_EP_diff_expression_results_with_correlations.csv")
+write.csv(sig_EN6_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_sig_EN6_diff_expression_results_with_correlations.csv")
+write.csv(sig_EN7_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/with_correlations/260916_sig_EN7_diff_expression_results_with_correlations.csv")
 
 
+# save longitudinal plots
 
+   tpm=as.data.frame(read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/other_counts/27.07.2016.Differentiation_v2.gene.tpm.tsv"))   # read tpm file for plotting   longitudinal tpm data
+   tpm$GeneID <- gsub("(ENSG[0-9]+).*", "\\1", tpm$GeneID) # cut everything after the dot
+   
+   samples=as.factor(c(1,2,3))
+   samples=rep(samples,8)
+   
+   
+   #order the columns by stage
+     order_by_stage=function(x,.stage=stage){
+       
+       nc=x[ , grepl( "iPSC" , names( x ) ) ]  #takes columns whose name matches x
+       
+       #Do the same for the other stages
+       
+       for (s in stage[-1])  {         
+         
+         i= x[ , grepl( s , names( x ) ) ]
+         nc=cbind(nc,i)
+       }
+       
+       x=cbind(x[c(1:2)],nc)
+       return(x)
+     }
+     stage_2= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")  #shortening EN names
+
+   make_long_plots=function(y,.tpm=tpm,.samples=samples,n=9,.stage_2=stage_2,name){
+     
+     plot_long=y[1:n,1:2]   # keep id and names to plot longitudinal variation of these top n genes 
+     
+     plot_long=tpm[match(plot_long$ensembl_gene_id,tpm$GeneID),]
+     
+     
+     
+     plot_long=order_by_stage(plot_long)
+     
+     # melt data for ggplot2
+     
+     long = melt(plot_long, measure.vars = c(3:26))
+     
+     
+     # rename stages and samples
+     
+     long$variable=rep(stage_2,each=n*3)
+     colnames(long)[which(names(long) == "variable")] <- "stage"
+     long$sample=rep(samples,each=n)
+     long$stage <- factor(long$stage, levels=stage_2)
+     long$sample=as.factor(long$sample)
+     
+     
+   
+      tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_top20genes_long_plots",name,"vs_others.tiff",sep="_"), type="cairo",
+           width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+     p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +ylab("transcript per million")  +
+       geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes:",name)) +
+     theme( axis.text.x  = element_text(angle=60, vjust=0.5, size=12))
+     
+     print(p)
+     
+     dev.off()
+     
+     return(p)
+   }
+   
+   
+   # create list of dataframes for lapply
+   
+   tests=list(sig_iPSC_stage,sig_DE_stage,sig_PGT_stage,sig_PFG_stage,sig_PE_stage,sig_EP_stage,sig_EN6_stage,sig_EN7_stage)
+
+   for(i in 1:8){
+     
+     p=make_long_plots(tests[[i]],name=stage[i])
+     print(p)
+   }
+    
+     
+     
+     
+  dev.off()
+  
+  
+  
 ```
