@@ -430,21 +430,20 @@ write.csv(sig_EN7_stage,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/D
      
      
    
-      tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_top20genes_long_plots",name,"vs_others.tiff",sep="_"), type="cairo",
-           width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+      # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/contrasts/with_correlation/Diff_v2_top9genes_long_plots",name,sep="_"), type="cairo",
+      #      width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
      p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +ylab("transcript per million")  +
        geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes:",name)) +
      theme( axis.text.x  = element_text(angle=60, vjust=0.5, size=12))
      
-     print(p)
-     
-     dev.off()
+     ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/contrasts/with_correlation/Diff_v2_top9genes_long_plots",name,sep="_"),p,compression="lzw")
+   
      
      return(p)
    }
    
    
-   # create list of dataframes for lapply
+   # create list of dataframes 
    
    tests=list(sig_iPSC_stage,sig_DE_stage,sig_PGT_stage,sig_PFG_stage,sig_PE_stage,sig_EP_stage,sig_EN6_stage,sig_EN7_stage)
 
