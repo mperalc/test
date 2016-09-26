@@ -275,6 +275,7 @@ sdc_voom=plot_sdc(v2$E)
 ```
 
 Principal component analysis, similar to MDS:
+
 ```{r pca, echo=FALSE, fig.width=7, fig.height=7}
 
 
@@ -317,6 +318,26 @@ p=plot_pca(v2$E)
 p
 
 ```
+
+Estimating within sample and within stage correlation:
+
+```{r correlation, echo=FALSE}
+
+#create sample info table
+
+sample_info=as.data.frame(cbind(stages,samples))
+
+
+
+dupcor_sample <- duplicateCorrelation(v2,design1,block=sample_info$samples)
+dupcor_sample$consensus.correlation
+
+dupcor_stage <- duplicateCorrelation(v2,design1,block=sample_info$stages)
+dupcor_stage$consensus.correlation
+
+```
+
+The within sample correlation is `r dupcor_sample$consensus.correlation`
 
 Differential expression analysis:
 
