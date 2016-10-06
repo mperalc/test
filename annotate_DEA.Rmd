@@ -10,26 +10,85 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-```{r libraries, include=FALSE}
+```{r libraries and data, include=FALSE}
 library(biomaRt)
+library(GOstats)
+
+# import files for DE results for every stage
+# import dge object
+
+
+load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
+
+
 ```
 
 ## Gene ontology annotation
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+TheGOstats package has extensive facilities for testing the association of Gene Ontology (GO) The Gene Ontology Consortium (2000) terms to genes in a gene list. You can test for both over and under representation of GO terms using either the standard Hypergeometric test or a conditional Hypergeometric test that uses the relationships among the GO terms for conditioning (similar to that presented in Alexa et al. (2006)).
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+To perform an analysis using the Hypergeometric-based tests, one needs to define a gene universe (usually conceptualized as the number of balls in an urn) and a list of selected genes from the universe. While it is clear that the selected gene list determines to a large degree the results of the analysis, the fact that the universe has a large effect on the conclusions is,
+perhaps, less obvious.
 
+It is worth noting that the effect of increasing the universe size with genes that are irrelevant to the questions at hand, in general, has the effect of making the resultant p-values look more significant. For example, in a universe of 1000 genes where 400 have been selected, suppose that a GO term has 40 gene annotations from the universe of 1000. If 10 of the genes in the selected gene list are among the 40 genes annotated at this category, then the Hypergeometric p-value is 0.99. However, if the gene universe contained 5000 genes, the p-value would drop to 0.001.
 ```{r cars}
-summary(cars)
+
+
+#perform GO enrichment using GOstats
+#calculate q-values for enrichment results
+
+##get the entrez IDs for the genes of interest. Takes Ensembl gene ids from my data
+all_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = rownames(dge_cc), mart = ensembl)  # all genes from dge object
+sig_iPSC_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = rownames(sig_iPSC_stage), mart = ensembl)
+sig_DE_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = rownames(sig_DE_stage), mart = ensembl)
+sig_GT_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = rownames(sig_GT_stage), mart = ensembl)
+sig_PF_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = rownames(sig_PF_stage), mart = ensembl)
+sig_PE_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = rownames(sig_PE_stage), mart = ensembl)
+sig_EN_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = rownames(sig_EN_stage), mart = ensembl)	
+
+# results: data frame with ensembl_gene_id and entrez gene id
+
+##Get the entrez gene identifiers that are mapped to a GO ID
+entrez_object <- org.Hs.egGO
+mapped_genes <- mappedkeys(entrez_object) # all entrez keys that have GO id
+all_with_go <- unique(intersect(all_ensembl_to_entrez$entrezgene,mapped_genes)) # all genes that have GO id from dge object
+sig_iPSC_with_go <- unique(intersect(sig_iPSC_ensembl_to_entrez$entrezgene,mapped_genes)) # now for every sig DEA results
+sig_DE_with_go <- unique(intersect(sig_DE_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_GT_with_go <- unique(intersect(sig_GT_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_PF_with_go <- unique(intersect(sig_PF_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_PE_with_go <- unique(intersect(sig_PE_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_EN_with_go <- unique(intersect(sig_EN_ensembl_to_entrez$entrezgene,mapped_genes))
+
+##run the hypergeometric test on GO biological process
+#iPSC
+params <- new('GOHyperGParams',
+              geneIds=sig_iPSC_with_go,
+              universeGeneIds=all_with_go,
+              ontology='BP',
+              pvalueCutoff=1,
+              conditional=T,
+              testDirection='over',
+              annotation="org.Hs.eg.db"
+             )
+hgOver <- hyperGTest(params)
+result <- summary(hgOver)
+result <- result[which(result$Size > 1 & result$Count > 1),]
+##calculate qvalues
+result <- cbind(result,Qvalue=qvalue(result$Pvalue)$qvalue)
+write.table(file="GOstats_GO_BP_iPSC.result.tsv",result,quote=F,sep="\t",row.names=F)
+
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
