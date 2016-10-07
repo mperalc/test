@@ -15,6 +15,17 @@ library(biomaRt)
 library(GOstats)
 
 # import files for DE results for every stage
+
+sig_iPSC_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_iPSC_diff_expression_results.csv")
+sig_DE_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_DE_diff_expression_results.csv")
+sig_PGT_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_PGT_diff_expression_results.csv")
+sig_PFG_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_PFG_diff_expression_results.csv")
+sig_PE_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_PE_diff_expression_results.csv")
+sig_EP_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_EP_diff_expression_results.csv")
+sig_EN6_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_EN6_diff_expression_results.csv")
+sig_EN7_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_EN7_diff_expression_results.csv")
+
+ 
 # import dge object
 
 
@@ -36,6 +47,7 @@ It is worth noting that the effect of increasing the universe size with genes th
 
 #perform GO enrichment using GOstats
 #calculate q-values for enrichment results
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL",dataset="hsapiens_gene_ensembl",host="www.ensembl.org")
 
 ##get the entrez IDs for the genes of interest. Takes Ensembl gene ids from my data
 all_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
@@ -43,48 +55,63 @@ all_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'),
                                 values = rownames(dge_cc), mart = ensembl)  # all genes from dge object
 sig_iPSC_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
                                 filters = 'ensembl_gene_id', 
-                                values = rownames(sig_iPSC_stage), mart = ensembl)
+                                values = sig_iPSC_stage$ensembl_gene_id, mart = ensembl)
 sig_DE_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
                                 filters = 'ensembl_gene_id', 
-                                values = rownames(sig_DE_stage), mart = ensembl)
-sig_GT_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                values = sig_DE_stage$ensembl_gene_id, mart = ensembl)
+sig_PGT_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
                                 filters = 'ensembl_gene_id', 
-                                values = rownames(sig_GT_stage), mart = ensembl)
-sig_PF_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                values = sig_PGT_stage$ensembl_gene_id, mart = ensembl)
+sig_PFG_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
                                 filters = 'ensembl_gene_id', 
-                                values = rownames(sig_PF_stage), mart = ensembl)
+                                values = sig_PFG_stage$ensembl_gene_id, mart = ensembl)
 sig_PE_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
                                 filters = 'ensembl_gene_id', 
-                                values = rownames(sig_PE_stage), mart = ensembl)
-sig_EN_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                values = sig_PE_stage$ensembl_gene_id, mart = ensembl)
+sig_EP_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
                                 filters = 'ensembl_gene_id', 
-                                values = rownames(sig_EN_stage), mart = ensembl)	
+                                values = sig_EP_stage$ensembl_gene_id, mart = ensembl)	
+sig_EN6_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = sig_EN6_stage$ensembl_gene_id, mart = ensembl)	
+sig_EN7_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                filters = 'ensembl_gene_id', 
+                                values = sig_EN7_stage$ensembl_gene_id, mart = ensembl)	
+
+# there are entrez gene IDS for more than one ensembl id, and at the same time there are ensembl ids without entrez gene ids.
 
 # results: data frame with ensembl_gene_id and entrez gene id
 
 ##Get the entrez gene identifiers that are mapped to a GO ID
 entrez_object <- org.Hs.egGO
 mapped_genes <- mappedkeys(entrez_object) # all entrez keys that have GO id
-all_with_go <- unique(intersect(all_ensembl_to_entrez$entrezgene,mapped_genes)) # all genes that have GO id from dge object
+all_with_go <- unique(intersect(all_ensembl_to_entrez$entrezgene,mapped_genes)) # all entrez ids that have GO id from dge object
 sig_iPSC_with_go <- unique(intersect(sig_iPSC_ensembl_to_entrez$entrezgene,mapped_genes)) # now for every sig DEA results
 sig_DE_with_go <- unique(intersect(sig_DE_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_GT_with_go <- unique(intersect(sig_GT_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_PF_with_go <- unique(intersect(sig_PF_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_PGT_with_go <- unique(intersect(sig_PGT_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_PFG_with_go <- unique(intersect(sig_PFG_ensembl_to_entrez$entrezgene,mapped_genes))
 sig_PE_with_go <- unique(intersect(sig_PE_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_EN_with_go <- unique(intersect(sig_EN_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_EP_with_go <- unique(intersect(sig_EP_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_EN6_with_go <- unique(intersect(sig_EN6_ensembl_to_entrez$entrezgene,mapped_genes))
+sig_EN7_with_go <- unique(intersect(sig_EN7_ensembl_to_entrez$entrezgene,mapped_genes))
 
 ##run the hypergeometric test on GO biological process
 #iPSC
 params <- new('GOHyperGParams',
-              geneIds=sig_iPSC_with_go,
-              universeGeneIds=all_with_go,
+              geneIds=sig_iPSC_with_go,  # list of genes I'm testing
+              universeGeneIds=all_with_go, # list of genes I used in my DE analysis (all my genes with RNA-seq data)
               ontology='BP',
-              pvalueCutoff=1,
+              pvalueCutoff=0.01,  # p value <0.01
               conditional=T,
               testDirection='over',
               annotation="org.Hs.eg.db"
              )
 hgOver <- hyperGTest(params)
+hgOver  
+
+# Printing the result at the R prompt provides a brief summary of the test performed and the number of significant terms found. Depending on how you pre-processed your gene list and gene universe, The hyperGTest function may have to do even more filtering
+# on both of these for you. Genes that are not marked with a GO term from the ontology that you specified will have to be discarded, and so you might notice that your gene list and gene universe had shrank somewhat when you print the results.
+
 result <- summary(hgOver)
 result <- result[which(result$Size > 1 & result$Count > 1),]
 ##calculate qvalues
