@@ -1,7 +1,7 @@
 ---
 title: "Annotation for differential expression analysis"
 author: "Marta Perez Alcantara"
-date: "6 de octubre de 2016"
+date: "10 October 2016"
 output: html_document
 ---
 
@@ -14,6 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(biomaRt)
 library(GOstats)
 library(qvalue)
+library(org.Hs.eg.db)
 
 ```
 ```{r import data,message=FALSE}
@@ -25,21 +26,17 @@ sig_stages=list()
 
 for(i in stage){
   sig_stages[[i]]= read.csv(paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_",i,"_diff_expression_results.csv",sep=""))
- 
 
 }
  
 # import dge object
-
 
 load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
 ```
 
 
 
-
-
-## Gene ontology annotation
+# Gene ontology annotation
 
 TheGOstats package has extensive facilities for testing the association of Gene Ontology (GO) The Gene Ontology Consortium (2000) terms to genes in a gene list. You can test for both over and under representation of GO terms using either the standard Hypergeometric test or a conditional Hypergeometric test that uses the relationships among the GO terms for conditioning (similar to that presented in Alexa et al. (2006)).
 
@@ -50,7 +47,7 @@ It is worth noting that the effect of increasing the universe size with genes th
 
 I start by getting the entrez IDs of genes of interest:
 
-```{r entrez IDs}
+```{r entrez IDs,message=FALSE}
 
 
 #perform GO enrichment using GOstats
@@ -69,14 +66,9 @@ for(i in stage){
   sig_genes[[i]] <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
                                        filters = 'ensembl_gene_id', 
                                        values = sig_stages[[i]]$ensembl_gene_id, mart = ensembl)
-  
-  
-  
 }
 
-
 # results: data frame with ensembl_gene_id and entrez gene id
-
 
 ```
 
@@ -95,8 +87,6 @@ all_with_go <- unique(intersect(all_ensembl_to_entrez$entrezgene,mapped_genes)) 
 sig_genes_with_go <- list()
 
 for(i in stage){
-  
-  
   
   sig_genes_with_go[[i]]=unique(intersect(sig_genes[[i]]$entrezgene,mapped_genes))
   
@@ -140,8 +130,6 @@ Printing the result at the R prompt provides a brief summary of the test perform
 ```{r write results}
 
 for(i in stage){
-  
-
 
   write.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/GOstats_GO_BP_",i,"_sig_result.csv",sep=""),GO_list[[i]],row.names=F)
 
