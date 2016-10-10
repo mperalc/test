@@ -13,18 +13,20 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r libraries and data, include=FALSE}
 library(biomaRt)
 library(GOstats)
+library(qvalue)
+
+
+stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")
 
 # import files for DE results for every stage
 
-sig_iPSC_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_iPSC_diff_expression_results.csv")
-sig_DE_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_DE_diff_expression_results.csv")
-sig_PGT_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_PGT_diff_expression_results.csv")
-sig_PFG_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_PFG_diff_expression_results.csv")
-sig_PE_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_PE_diff_expression_results.csv")
-sig_EP_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_EP_diff_expression_results.csv")
-sig_EN6_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_EN6_diff_expression_results.csv")
-sig_EN7_stage= read.csv("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_EN7_diff_expression_results.csv")
+sig_stages=list()
 
+for(i in stage){
+  sig_stages[[i]]= read.csv(paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_",i,"_diff_expression_results.csv",sep=""))
+ 
+
+}
  
 # import dge object
 
@@ -53,69 +55,75 @@ ensembl <- useMart("ENSEMBL_MART_ENSEMBL",dataset="hsapiens_gene_ensembl",host="
 all_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
                                 filters = 'ensembl_gene_id', 
                                 values = rownames(dge_cc), mart = ensembl)  # all genes from dge object
-sig_iPSC_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
-                                filters = 'ensembl_gene_id', 
-                                values = sig_iPSC_stage$ensembl_gene_id, mart = ensembl)
-sig_DE_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
-                                filters = 'ensembl_gene_id', 
-                                values = sig_DE_stage$ensembl_gene_id, mart = ensembl)
-sig_PGT_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
-                                filters = 'ensembl_gene_id', 
-                                values = sig_PGT_stage$ensembl_gene_id, mart = ensembl)
-sig_PFG_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
-                                filters = 'ensembl_gene_id', 
-                                values = sig_PFG_stage$ensembl_gene_id, mart = ensembl)
-sig_PE_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
-                                filters = 'ensembl_gene_id', 
-                                values = sig_PE_stage$ensembl_gene_id, mart = ensembl)
-sig_EP_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
-                                filters = 'ensembl_gene_id', 
-                                values = sig_EP_stage$ensembl_gene_id, mart = ensembl)	
-sig_EN6_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
-                                filters = 'ensembl_gene_id', 
-                                values = sig_EN6_stage$ensembl_gene_id, mart = ensembl)	
-sig_EN7_ensembl_to_entrez <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
-                                filters = 'ensembl_gene_id', 
-                                values = sig_EN7_stage$ensembl_gene_id, mart = ensembl)	
+
+sig_genes <- list()
+
+for(i in stage){
+
+  sig_genes[[i]] <- getBM(attributes=c('ensembl_gene_id', 'entrezgene'), 
+                                       filters = 'ensembl_gene_id', 
+                                       values = sig_stages[[i]]$ensembl_gene_id, mart = ensembl)
+  
+  
+  
+}
 
 # there are entrez gene IDS for more than one ensembl id, and at the same time there are ensembl ids without entrez gene ids.
 
 # results: data frame with ensembl_gene_id and entrez gene id
 
+
+
 ##Get the entrez gene identifiers that are mapped to a GO ID
 entrez_object <- org.Hs.egGO
 mapped_genes <- mappedkeys(entrez_object) # all entrez keys that have GO id
 all_with_go <- unique(intersect(all_ensembl_to_entrez$entrezgene,mapped_genes)) # all entrez ids that have GO id from dge object
-sig_iPSC_with_go <- unique(intersect(sig_iPSC_ensembl_to_entrez$entrezgene,mapped_genes)) # now for every sig DEA results
-sig_DE_with_go <- unique(intersect(sig_DE_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_PGT_with_go <- unique(intersect(sig_PGT_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_PFG_with_go <- unique(intersect(sig_PFG_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_PE_with_go <- unique(intersect(sig_PE_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_EP_with_go <- unique(intersect(sig_EP_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_EN6_with_go <- unique(intersect(sig_EN6_ensembl_to_entrez$entrezgene,mapped_genes))
-sig_EN7_with_go <- unique(intersect(sig_EN7_ensembl_to_entrez$entrezgene,mapped_genes))
+
+ # now for every sig DEA results
+sig_genes_with_go <- list()
+
+for(i in stage){
+  
+  
+  
+  sig_genes_with_go[[i]]=unique(intersect(sig_genes[[i]]$entrezgene,mapped_genes))
+  
+}
 
 ##run the hypergeometric test on GO biological process
-#iPSC
-params <- new('GOHyperGParams',
-              geneIds=sig_iPSC_with_go,  # list of genes I'm testing
-              universeGeneIds=all_with_go, # list of genes I used in my DE analysis (all my genes with RNA-seq data)
-              ontology='BP',
-              pvalueCutoff=0.01,  # p value <0.01
-              conditional=T,
-              testDirection='over',
-              annotation="org.Hs.eg.db"
-             )
-hgOver <- hyperGTest(params)
-hgOver  
+GO_list <- list()
 
-# Printing the result at the R prompt provides a brief summary of the test performed and the number of significant terms found. Depending on how you pre-processed your gene list and gene universe, The hyperGTest function may have to do even more filtering
-# on both of these for you. Genes that are not marked with a GO term from the ontology that you specified will have to be discarded, and so you might notice that your gene list and gene universe had shrank somewhat when you print the results.
 
-result <- summary(hgOver)
-result <- result[which(result$Size > 1 & result$Count > 1),]
-##calculate qvalues
-result <- cbind(result,Qvalue=qvalue(result$Pvalue)$qvalue)
-write.table(file="GOstats_GO_BP_iPSC.result.tsv",result,quote=F,sep="\t",row.names=F)
+for (i in stage){
+  params <- new('GOHyperGParams',
+                geneIds=sig_genes_with_go[[i]],  # list of genes I'm testing
+                universeGeneIds=all_with_go, # list of genes I used in my DE analysis (all my genes with RNA-seq data)
+                ontology='BP',  # biological process
+                pvalueCutoff=1,  # p value=1 to be able to calculate FDR adjusted p values later (q-values)
+                conditional=T,
+                testDirection='over',
+                annotation="org.Hs.eg.db"
+  )
+  hgOver <- hyperGTest(params)
+  hgOver  
+  
+  # Printing the result at the R prompt provides a brief summary of the test performed and the number of significant terms found. Depending on how you pre-processed your gene list and gene universe, The hyperGTest function may have to do even more filtering
+  # on both of these for you. Genes that are not marked with a GO term from the ontology that you specified will have to be discarded, and so you might notice that your gene list and gene universe had shrank somewhat when you print the results.
+  
+  result <- summary(hgOver)
+  result <- result[which(result$Size > 1 & result$Count > 1),]
+  ##calculate qvalues
+  result <- cbind(result,Qvalue=qvalue(result$Pvalue)$qvalue)
+  result <- result[which(result$Qvalue<0.05),] # saving GO terms with significant adjusted p-values
+  GO_list[[i]]<- result
 
+}
+
+for(i in stage){
+  
+
+
+  write.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/GOstats_GO_BP_",i,"_sig_result.csv",sep=""),GO_list[[i]],row.names=F)
+
+}
 ```
