@@ -10,12 +10,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-```{r libraries and data, include=FALSE}
+```{r libraries, message=FALSE}
 library(biomaRt)
 library(GOstats)
 library(qvalue)
 
-
+```
+```{r import data,message=FALSE}
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")
 
 # import files for DE results for every stage
@@ -32,9 +33,11 @@ for(i in stage){
 
 
 load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
-
-
 ```
+
+
+
+
 
 ## Gene ontology annotation
 
@@ -44,11 +47,14 @@ To perform an analysis using the Hypergeometric-based tests, one needs to define
 perhaps, less obvious.
 
 It is worth noting that the effect of increasing the universe size with genes that are irrelevant to the questions at hand, in general, has the effect of making the resultant p-values look more significant. For example, in a universe of 1000 genes where 400 have been selected, suppose that a GO term has 40 gene annotations from the universe of 1000. If 10 of the genes in the selected gene list are among the 40 genes annotated at this category, then the Hypergeometric p-value is 0.99. However, if the gene universe contained 5000 genes, the p-value would drop to 0.001.
-```{r cars}
+
+I start by getting the entrez IDs of genes of interest:
+
+```{r entrez IDs}
 
 
 #perform GO enrichment using GOstats
-#calculate q-values for enrichment results
+
 ensembl <- useMart("ENSEMBL_MART_ENSEMBL",dataset="hsapiens_gene_ensembl",host="www.ensembl.org")
 
 ##get the entrez IDs for the genes of interest. Takes Ensembl gene ids from my data
@@ -68,13 +74,19 @@ for(i in stage){
   
 }
 
-# there are entrez gene IDS for more than one ensembl id, and at the same time there are ensembl ids without entrez gene ids.
 
 # results: data frame with ensembl_gene_id and entrez gene id
 
 
+```
 
-##Get the entrez gene identifiers that are mapped to a GO ID
+There are entrez gene IDS for more than one ensembl id, and at the same time there are ensembl ids without entrez gene ids.
+
+Get the entrez gene identifiers that are mapped to a GO ID:
+
+
+```{r map GO id}
+
 entrez_object <- org.Hs.egGO
 mapped_genes <- mappedkeys(entrez_object) # all entrez keys that have GO id
 all_with_go <- unique(intersect(all_ensembl_to_entrez$entrezgene,mapped_genes)) # all entrez ids that have GO id from dge object
@@ -90,7 +102,12 @@ for(i in stage){
   
 }
 
-##run the hypergeometric test on GO biological process
+```
+
+Run the hypergeometric test on GO biological process:
+
+```{r hyperg test on BP}
+
 GO_list <- list()
 
 
@@ -106,10 +123,7 @@ for (i in stage){
   )
   hgOver <- hyperGTest(params)
   hgOver  
-  
-  # Printing the result at the R prompt provides a brief summary of the test performed and the number of significant terms found. Depending on how you pre-processed your gene list and gene universe, The hyperGTest function may have to do even more filtering
-  # on both of these for you. Genes that are not marked with a GO term from the ontology that you specified will have to be discarded, and so you might notice that your gene list and gene universe had shrank somewhat when you print the results.
-  
+
   result <- summary(hgOver)
   result <- result[which(result$Size > 1 & result$Count > 1),]
   ##calculate qvalues
@@ -119,6 +133,12 @@ for (i in stage){
 
 }
 
+```
+
+Printing the result at the R prompt provides a brief summary of the test performed and the number of significant terms found. Depending on how you pre-processed your gene list and gene universe, The hyperGTest function may have to do even more filtering on both of these for you. Genes that are not marked with a GO term from the ontology that you specified will have to be discarded, and so you might notice that your gene list and gene universe had shrank somewhat when you print the results.
+
+```{r write results}
+
 for(i in stage){
   
 
@@ -127,3 +147,4 @@ for(i in stage){
 
 }
 ```
+
