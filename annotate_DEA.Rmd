@@ -17,6 +17,7 @@ library(qvalue)
 library(org.Hs.eg.db)
 
 ```
+
 ```{r import data,message=FALSE}
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")
 
@@ -24,8 +25,12 @@ stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")
 
 sig_stages=list()
 
+# logFC>0 or logFC>1
+
 for(i in stage){
   sig_stages[[i]]= read.csv(paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_",i,"_diff_expression_results.csv",sep=""))
+  colnames(sig_stages[[i]]) <- c("ensembl_gene_id", "external_gene_name","gene_biotype", "chromosome_name","logFC","adj.P.Val")
+    
 
 }
  
@@ -115,13 +120,52 @@ for (i in stage){
   hgOver  
 
   result <- summary(hgOver)
-  result <- result[which(result$Size > 1 & result$Count > 1),]
+  
+  
+  result <- result[which(result$Size > 1 & result$Count > 1),] 
+  
+  png(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/GO_histograms/GO_histogram_",i,".png",sep=""), type="cairo",
+       width=10,height=10,units="in",res=300,pointsize = 13) 
+  
+  hist(result$Pvalue, 
+       nclass = 20,
+        main = paste("Histogram of GO terms (BP) pvals:" , i, "stage")
+       )  #inspect histogram of p-values
+  dev.off()
+  # save
+  
+  # if x -> q value, if not p.adjust
+  # U shaped. Can't use qvalue package. Use p.adjust function using BH method.
+ 
+  
+  if(i %in% c("iPSC","EP","EN7")){
+   
+    result <- cbind(result,adjust_pval=p.adjust(result$Pvalue))
+    result <- result[which(result$adjust_pval<0.05),] # saving GO terms with significant adjusted p-values
+    
+  } else{
+    
+    result <- cbind(result,Qvalue=qvalue(result$Pvalue)$qvalue)
+    result <- result[which(result$Qvalue<0.05),]
+  }
+  
+  
+  # for all:
+  
   ##calculate qvalues
-  result <- cbind(result,Qvalue=qvalue(result$Pvalue)$qvalue)
-  result <- result[which(result$Qvalue<0.05),] # saving GO terms with significant adjusted p-values
+  # result <- cbind(result,Qvalue=qvalue(result$Pvalue)$qvalue)
+  # result <- result[which(result$Qvalue<0.05),] 
+  
+  # # ## calculate adjusted pvalues
+  # result <- cbind(result,adjust_pval=p.adjust(result$Pvalue))
+  # result <- result[which(result$adjust_pval<0.05),] # saving GO terms with significant adjusted p-values
+
+  
   GO_list[[i]]<- result
 
 }
+
+
 
 ```
 
@@ -131,8 +175,10 @@ Printing the result at the R prompt provides a brief summary of the test perform
 
 for(i in stage){
 
-  write.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/GOstats_GO_BP_",i,"_sig_result.csv",sep=""),GO_list[[i]],row.names=F)
+    # change name according to method used to calculate adjusted p-vals
+  write.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/GOstats_GO_BP_",i,"_sig_result_mixed_adjustments.csv",sep=""),GO_list[[i]],row.names=F)
 
 }
+
 ```
 
