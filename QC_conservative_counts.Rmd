@@ -156,9 +156,14 @@ return(c)
 c=trim_by_stage(dge_cc)
 fail_cc=100*(length(c)/nrow(dge_cc$counts))
 genes_fail_cc=length(c)
-dge_cc$counts=as.data.frame(dge_cc$counts[-c,])    # counts now has 17892 genes
-rm(c)
-all_ensembl_info_cc=all_ensembl_info_cc[rownames(dge_cc$counts),] #keep in gene info file the genes that still are in counts
+ditch=dge_cc$counts[c,] # table to throw away
+
+keep=!(rownames(dge_cc$counts) %in% rownames(ditch))
+
+dge_cc <- dge_cc[keep, , keep.lib.sizes=FALSE] # counts now has 17892 genes
+    
+rm(c,keep,ditch)
+
 
 ```
 After trimming, conservative counts has `r nrow(dge_cc)` genes. Conservative counts has lost  `r genes_fail_cc` genes (`r fail_cc`% from previous total).
@@ -172,6 +177,10 @@ Now I will 1) keep only lincRNA and protein coding genes, and 2) exclude mitocho
 before=nrow(dge_cc)
 dge_cc <- dge_cc[which(dge_cc$genes$gene_biotype == "protein_coding" | dge_cc$genes$gene_biotype == "lincRNA"),]
 
+
+# now has 15859 genes
+# dge_cc <- dge_cc[keep, , keep.lib.sizes=FALSE] # counts now has 17892 genes
+    
 gene_lost_step_1_cc=before-nrow(dge_cc)
 before=nrow(dge_cc)
 
@@ -179,15 +188,8 @@ before=nrow(dge_cc)
 chr <- c(1:22)
 dge_cc <- dge_cc[which(dge_cc$genes$chromosome_name %in% chr),]
 
-gene_lost_step_2_cc=before-nrow(dge_cc)
-rm(before)
+# now has 15280 genes
 
-all_ensembl_info_cc=all_ensembl_info_cc[rownames(dge_cc$counts),] #keep in gene info file the genes that still are in counts
-dge_cc$genes=all_ensembl_info_cc #update DGE object with gene counts
-
-missing=grep("NA", rownames(dge_cc$counts))  #for some reason I have 2 NA values at the end of the table, and can access the table outside its boundaries (which gives NA values)
-
-dge_cc=dge_cc[-missing,]
 
 ```
 Conservative counts has `r nrow(dge_cc)` genes, and lost `r gene_lost_step_1_cc` genes on the first trim, and `r gene_lost_step_2_cc` genes on the second. 
