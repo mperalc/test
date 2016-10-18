@@ -16,6 +16,8 @@ library(GOstats)
 library(qvalue)
 library(org.Hs.eg.db)
 
+currentDate <- Sys.Date() # to save date in name of output files
+
 ```
 
 ```{r import data,message=FALSE}
@@ -28,7 +30,7 @@ sig_stages=list()
 # logFC>0 or logFC>1
 
 for(i in stage){
-  sig_stages[[i]]= read.csv(paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-05_sig_maxvals_",i,"_diff_expression_results.csv",sep=""))
+  sig_stages[[i]]= read.csv(paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-17_sig_maxvals_",i,"_diff_expression_results_logFC1.csv",sep=""))
   colnames(sig_stages[[i]]) <- c("ensembl_gene_id", "external_gene_name","gene_biotype", "chromosome_name","logFC","adj.P.Val")
     
 
@@ -124,8 +126,8 @@ for (i in stage){
   
   result <- result[which(result$Size > 1 & result$Count > 1),] 
   
-  png(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/GO_histograms/GO_histogram_",i,".png",sep=""), type="cairo",
-       width=10,height=10,units="in",res=300,pointsize = 13) 
+  png(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/GO_histograms/logFC_above_1/",currentDate,"GO_histogram_",i,".png",sep=""), type="cairo",
+       width=10,height=10,units="in",res=300,pointsize = 13)
   
   hist(result$Pvalue, 
        nclass = 20,
@@ -175,8 +177,8 @@ Printing the result at the R prompt provides a brief summary of the test perform
 
 for(i in stage){
 
-    # change name according to method used to calculate adjusted p-vals
-  write.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/GOstats_GO_BP_",i,"_sig_result_mixed_adjustments.csv",sep=""),GO_list[[i]],row.names=F)
+    # change name according to method used to calculate adjusted p-vals and logFC>1 or 0
+  write.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/",currentDate,"GOstats_GO_BP_",i,"_sig_result_mixed_adjustments_logFC1.csv",sep=""),GO_list[[i]],row.names=F)
 
 }
 
