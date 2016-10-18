@@ -178,7 +178,7 @@ Printing the result at the R prompt provides a brief summary of the test perform
 for(i in stage){
 
     # change name according to method used to calculate adjusted p-vals and logFC>1 or 0
-  write.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/",currentDate,"GOstats_GO_BP_",i,"_sig_result_mixed_adjustments_logFC1.csv",sep=""),GO_list[[i]],row.names=F)
+  write.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/",currentDate,"_GOstats_GO_BP_",i,"_sig_result_mixed_adjustments_logFC1.csv",sep=""),GO_list[[i]],row.names=F)
 
 }
 
