@@ -1,4 +1,4 @@
-# Making venn diagrams
+# Making venn diagrams and mergin DEA tables with peak and across-stages results
 
 #load libraries
   library(VennDiagram)
