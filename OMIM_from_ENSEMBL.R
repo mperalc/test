@@ -57,12 +57,16 @@ my_list=lapply(my_list,function(x)x[!is.na(x)])         # remove Nas
 
 my_list_omim <-list()
 
-for(i in stage){
-print(system.time(my_list_omim[[i]] <- lapply(lapply(my_list[[i]], get_omim), get_title)))
-  # get_omim gets XML result for the list of OMIM id, in order.
-  # get_title gives as a list the phenotype titles from OMIM ids. 
-}
+# for(i in stage){
+# print(system.time(my_list_omim[[i]] <- lapply(lapply(my_list[[i]], get_omim), get_title)))
+#   # get_omim gets XML result for the list of OMIM id, in order.
+#   # get_title gives as a list the phenotype titles from OMIM ids. 
+# }
 
+
+# save OMIM object to save time in each run 
+# save(my_list_omim, file = "/Users/Marta/Documents/WTCHG/DPhil/Data/OMIM/session_objects/my_list_omim.xz" , compress="xz")
+ load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/OMIM/session_objects/my_list_omim.xz",verbose=TRUE)  #loading the OMIM list object
 
 df<-list()
 OMIM_unique<-list()
@@ -78,14 +82,24 @@ for(i in stage){
   # keep NAs
   
   mappedGenes[[i]]$OMIM_term=OMIM_unique[[i]][match(mappedGenes[[i]]$OMIM,OMIM_unique[[i]]$OMIM),4]
-
+  colnames(mappedGenes[[i]])[1]="ensembl_gene_id"
 }
 
 
 
 # merge OMIM terms result into DEA table#############################################################DO
+full_tables <- list()
 
 
+for(i in stage){
+  
+  full_tables[[i]] = merge(sig_stages[[i]],mappedGenes[[i]], by="ensembl_gene_id") 
+  
+ # there are repeated genes, as there might be various OMIM terms associated with a certain gene 
+  write.table(full_tables[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/comparison_with_and_without_contrasts/OMIM/",
+                                                                   currentDate,"_sig_",i,"_DEA_maxvals_stage-unique_and_across-stages_logFC1_OMIM.tsv",sep=""),sep="\t")
+  
+}
 
 
 
@@ -93,8 +107,8 @@ for(i in stage){
 ####################################################################################################
 # Creating smaller tables including just genes with OMIM terms related to pancreatic defects, development defects, 
 # diabetes, obesity, endocrine problems, etc
-summary_terms=c("DIABETES","GLYCEMIA","HYPERGLYCEMIA","OBESITY","ENDOCRINE","PANCREAS",
-          "DEVELOPMENT"," LIVER ","INSULIN", "SUGAR", "GLUCAGON")
+summary_terms=c("DIABETES","GLYCEMIA","OBESITY","ENDOCRINE","PANCREAS","PANCREATIC","BODY MASS INDEX",
+          "DEVELOPMENT"," LIVER ","INSULIN", "SUGAR", "GLUCAGON", "ISLET")
 #liver is surrounded by spaces so as not to catch other word that include it (like "oliver")
 
 small_table =list()
@@ -113,7 +127,7 @@ for(i in stage){
   keep$summary_terms=gsub("\\..*","",rownames(keep))
   # merge DEA results into this smaller table and save
   
-  small_table[[i]]=sig_stages[[i]][match(keep$ENSEMBL,sig_stages[[i]]$ensembl_gene_id),]
+  small_table[[i]]=sig_stages[[i]][match(keep$ensembl_gene_id,sig_stages[[i]]$ensembl_gene_id),]
   # (check that I'm not losing OMIM terms per ENSEMBL id, as they can have more than one in the "keep" table)
   small_table[[i]]=cbind(small_table[[i]],keep[,c(3,4,5)])
 
@@ -129,16 +143,16 @@ for(i in stage){
   
   small_table[[i]] <- subset(small_table[[i]], !duplicated(ensembl_gene_id)) # taking out duplicate genes before merging
   
-  ## add summary terms somewhere
  
-  small_table_aggr[[i]]=merge(small_table[[i]][c(1:9)],small_table_aggr[[i]], by="ensembl_gene_id")
+ 
+  small_table_aggr[[i]]=merge(small_table[[i]][c(1:9)],small_table_aggr[[i]], by="ensembl_gene_id") # merge p-vals, logFCs, etc
   colnames(small_table_aggr[[i]])[11]="OMIM_terms"
   
   
   small_table_aggr[[i]] = apply(small_table_aggr[[i]], 2, gsub, patt=",", replace=" - ") # replace commas with - for easier import in excel
   
   
-  write.table(small_table_aggr[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/comparison_with_and_without_contrasts/",
+  write.table(small_table_aggr[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/comparison_with_and_without_contrasts/OMIM/",
                                                                  currentDate,"_sig_",i,"_DEA_maxvals_stage-unique_and_across-stages_logFC1_OMIM_interesting_terms.tsv",sep=""),sep="\t")
 }
 
