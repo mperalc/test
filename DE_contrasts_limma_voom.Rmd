@@ -1,0 +1,530 @@
+---
+title: "Differential expression with contrasts"
+author: "Marta Perez Alcantara"
+date: "13 de septiembre de 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Differential expression using limma+voom
+
+In this document I will perform an "static" differential expression analysis, comparing one stage to the others and taking into account the samples.
+I start loading the dge object for conservative counts.
+
+```{r initial,echo=FALSE}
+
+
+currentDate <- Sys.Date() # to save date in name of output files
+
+
+
+library(pheatmap)
+library(RColorBrewer)
+library(org.Hs.eg.db)
+library(limma)
+library(ggbiplot)
+library(ggrepel) # provides geoms for ggplot2 to repel overlapping text labels.
+library(ggplot2)
+library(ggfortify)
+library(reshape2)  # to modify dataframes for ggplot2
+library(knitr)   #for tables in rmd
+library(pander)  #more tables
+library(readr) # fast reading of large files
+
+
+
+load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
+
+
+donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
+
+stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
+
+# order by samples, to make the design matrix clearer:
+
+
+order_by_samples=function(x,donors.= donors){
+nc=x[ , grepl( "Ad2.1" , colnames( x) ) ]  #takes columns whose name matches x
+
+#Do the same for the other stages
+
+for (s in donors.[-1])  {         
+  
+  i= x[ , grepl( s , colnames( x ) ) ]
+  nc=cbind(nc,i)
+}
+
+return(nc)
+}
+
+dge_cc$counts=order_by_samples(dge_cc$counts)
+
+#same with sample matrix from dge:
+
+
+order_by_samples2=function(x,donors.= donors){
+nc=x[ grep( "Ad2.1" , rownames( x) ), ]  #takes columns whose name matches x
+
+#Do the same for the other stages
+
+for (s in donors.[-1])  {         
+  
+  i= x[ grep( s , rownames( x ) ), ]
+  nc=rbind(nc,i)
+}
+
+return(nc)
+}
+
+dge_cc$samples=order_by_samples2(dge_cc$samples)
+
+
+
+```
+
+
+Our DGE object for conservative counts has `r nrow(dge_cc$counts)` genes. First I calculate the normalization factors using TMM.
+
+
+```{r normalization factors,echo=FALSE}
+
+
+dge_cc <- calcNormFactors(dge_cc)    # TMM by default, RLE or UQ also possible
+
+
+
+```
+
+
+Now I'll create the design matrix. 
+
+
+```{r design matrix, echo=FALSE}
+ 
+samples <- c(rep(c("sample1","sample2","sample3"),each=8))   # create the design matrix
+samples=as.factor(samples)
+#stages <-rep(stage,each=3) 
+stages <- c(rep(1:8,3))
+stages <- as.factor(stages)
+design1 <- model.matrix(~stages + samples)                    
+kable(design1)
+# Now it looks like a normal design matrix, ready to create the contrast matrix
+```
+
+
+This is the design matrix. The base in the design matrix is sample 1 for the samples, and iPSC for the stages (they don't appear on the design matrix because it has all the information now about all the samples and stages). 
+
+The contrast matrix looks like this:
+
+
+```{r contrast matrix, echo=FALSE}
+contrast.matrix= rbind(0,diag(7),0,0)
+print(contrast.matrix)
+
+```
+
+
+The base in the design matrix is sample 1 for the samples, and iPSC for the stages (they don't appear on the design matrix because it has all the information now about all the samples and stages). 
+
+
+For the linear model, I'll do a voom transformation. It uses the experiment design matrix, and produces an EList object using normalised data to convert the read counts to log2-cpm, with associated weights, ready for linear modelling.The limma-voom method assumes that rows with zero or very low counts have been removed. For design matrix with iPSC only:
+
+
+
+```{r voom normalization, echo=FALSE}
+
+
+v2=voom(dge_cc,design=design1,plot=TRUE)   
+# This converts the counts to log-counts per million with associated precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data.
+
+par(mfrow=c(1,2))
+plot(log2(dge_cc$counts + 1)[,1:2],
+     pch=16, cex=0.3, main="log2")
+plot(v2$E[,1:2],
+     pch=16, cex=0.3, main=" voom norm counts")
+
+# For first 50 genes, see the distribution of counts:
+random_sample=sample(nrow(dge_cc),50)
+par(mfrow=c(1,3))
+plot(density(as.numeric(unlist(dge_cc$counts[random_sample,]))), main="counts", cex.main=2)
+plot(density(as.numeric(unlist(log2(dge_cc$counts+1)[random_sample,]))), main="log2", cex.main=2)
+plot(density(as.numeric(unlist(v2$E[random_sample,]))), main="voom norm counts", cex.main=2)
+
+
+```
+
+
+I have plotted the untransformed and the log2 transformed counts for a random sample of 50 genes across the 24 samples. Most genes have ~1000 counts (log2=10). The count data follows a skewed distribution with a large dynamic range and a large tail of “extreme values” to the right of the distribution. The voom transformed values have negative values, compared to the log2 transformed ones, because it transforms to log2 of cpm. If we transform our counts to cpm and then log2 we see very similar numbers.
+
+Before fitting the linear model, I'll perform multi-dimensional scaling:  Plot samples on a two-dimensional scatterplot so that distances on the plot approximate the typical log2 fold changes between the samples (MDS).
+
+
+
+```{r mds, echo=FALSE, fig.width=7, fig.height=7}
+
+#function wrap so that plotMDS doesn't produce a plot when called:
+plotMDS.invisible <- function(...){
+    ff <- tempfile()
+    png(filename=ff)
+    res <- plotMDS(...)
+    dev.off()
+    unlink(ff)
+    res
+}
+
+pretty_mds=function(v2){
+  mds_p=plotMDS.invisible(v2$E,gene.selection = "pairwise")    # pairwise method (default)
+  mds_c=plotMDS.invisible(v2$E,gene.selection = "common")      #common method 
+  
+  stages <-rep(stage,3) 
+  # Rearrange data for ggplot
+  
+  # method: pairwise
+  m_p=as.data.frame(mds_p$cmdscale.out)
+  m_p <- cbind(m_p,sample=samples,stage=stages)
+  colnames(m_p)=c("Dimension 1", "Dimension 2", "Samples","Stages")
+  
+  # method: common
+  m_c=as.data.frame(mds_c$cmdscale.out)
+  m_c <- cbind(m_c,sample=samples,stage=stages)
+  colnames(m_c)=c("Dimension 1", "Dimension 2", "Samples","Stages")
+  
+  
+  # plot pairwise
+  
+ # if(qc_plots==TRUE){
+    #tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MDS_pairwise_only_ours.tiff", type="cairo",
+        # width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw")
+    mp=ggplot(m_p) +
+      geom_point(aes(`Dimension 1` ,`Dimension 2`), size = 2, color = 'grey') +
+      geom_label_repel(
+        aes(`Dimension 1` , `Dimension 2`, fill = factor(Samples), label = Stages),
+        fontface = 'bold', color = 'white',
+        box.padding = unit(0.25, "lines"),
+        point.padding = unit(0.25, "lines")
+      ) +
+      coord_fixed(ratio = 1.2) +
+      
+      theme_bw(base_size=20) + 
+      theme(plot.background = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank() )+
+      theme(panel.border= element_rect())+
+      
+      theme(legend.position = "bottom")  +
+      ggtitle("MDS plot:pairwise method")+
+      labs(fill = "Sample")
+   # dev.off()
+    
+    # plot common
+    # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MDS_common_only_ours.tiff", type="cairo",
+    #      width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw")
+   mc= ggplot(m_c) +
+      geom_point(aes(`Dimension 1` ,`Dimension 2`), size = 2, color = 'grey') +
+      geom_label_repel(
+        aes(`Dimension 1` , `Dimension 2`, fill = factor(Samples), label = Stages),
+        fontface = 'bold', color = 'white',
+        box.padding = unit(0.25, "lines"),
+        point.padding = unit(0.25, "lines")
+      ) +
+     coord_fixed(ratio = 2) +  #fix x-y ratio
+      
+      theme_bw(base_size=20) + 
+      theme(plot.background = element_blank(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank() )+
+      theme(panel.border= element_rect())+
+      
+      theme(legend.position = "bottom")  +
+      ggtitle("MDS plot: common method")+
+      labs(fill = "Sample")
+   # dev.off()
+    
+#  }
+   return(list(mp,mc))   #return both plots as a list
+}
+
+mds_plots=pretty_mds(v2)
+
+plot(mds_plots[[1]])
+plot(mds_plots[[2]])
+
+
+```
+
+
+The distance between each pair of samples is the root-mean-square deviation (Euclidean distance) for the top genes. Distances on the plot can be interpreted as leading log2-fold-change, meaning the typical (root-mean-square) log2-fold-change between the samples for the genes that distinguish those samples. If gene.selection is "common", then the top genes are those with the largest standard deviations between samples. If gene.selection is "pairwise", then a different set of top genes is selected for each pair of samples. The pairwise feature selection may be appropriate for microarray data when different molecular pathways are relevant for distinguishing different pairs of samples. 
+
+In this case, we see for the "pairwise" method that EN stages cluster by stage (6 or 7) and not by sample. In the "common" method, the opposite happens. Nothing else changes much between the two plots. My interpretation is that the genes that drive the variance between all stages, that are used in the common method, are not the ones that distinguish the late EN stages. There is in reality for EN a much higher similarity between samples than between stages, and therefore the stages need to be separated by different genes (as shown in the pairwise method). Plotting the two versions shows us interesting information about the data. The "pairwise" method also shows that samples Ad2.1 and Neo1.1 are closer in EN stage 7 than sample Ad3.1. We saw from the longitudinal TPM plots of selected marker genes that sample Ad3.1 is better differentiated.
+
+Now I plot the sample distance cluster (look for the meaning of the legend):
+
+
+
+```{r sdc, echo=FALSE, fig.width=7, fig.height=7}
+################## get sample distance cluster  ##################
+
+plot_sdc=function(x){
+  sampleDists <- dist(t(x))   
+  #This function computes and returns the distance matrix computed by using the specified distance measure to compute the distances between the rows of a data matrix.
+  # by default, "euclidean"
+  sampleDistMatrix <- as.matrix(sampleDists)
+  stages <-rep(stage,3) 
+  rownames(sampleDistMatrix) <- paste(stages, samples, sep="-")
+  colnames(sampleDistMatrix) <- NULL
+  colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+  # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_Distance_clustering.tiff", type="cairo",
+  # width=10,height=8,units="in",res=300,pointsize = 13,compression="lzw") 
+  sdc= pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors)
+  # dev.off()
+  
+  return(sdc)
+}
+
+sdc_voom=plot_sdc(v2$E) 
+
+
+
+
+```
+
+
+Principal component analysis, similar to MDS:
+
+
+
+```{r pca, echo=FALSE, fig.width=7, fig.height=7}
+
+
+# this gives the wrong result
+
+
+# tried for different designs: exactly the same
+par(mfrow=c(1,1))
+stages <-rep(stage,3) 
+plot_pca=function(x,s=samples,st=stages){
+  pca1<-prcomp(t(x), retx=TRUE)
+  
+  plot(pca1, type = "l") #variance vs first 10 components
+  summary(pca1)          #importance of each component (important line is "proportion of variance")
+  
+  percentVar <- (pca1$sdev)^2 / sum(pca1$sdev^2)
+  percentVar <- round(100 * percentVar)
+  pcs <- as.data.frame(pca1$x)
+  pcs <- cbind(pcs,sample=samples,stage=stages)
+  pcs$stage <- ordered(pcs$stage, levels = stage)
+  
+  p <- ggplot(pcs, aes(PC1, PC2, colour=stage, shape=samples)) + 
+    geom_point(size = 3) + xlab (paste0( "PC1:" ,percentVar[ 1 ],"% variance")) + 
+    ylab (paste0( "PC2: ",percentVar[ 2 ],"% variance" ))
+  p <- p + theme(	panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+                  panel.background = element_blank(),
+                  panel.border = element_rect(fill = NA, colour = "black"), 
+                  legend.key = element_blank(),# legend.position = c(0.5,0.5),
+                  axis.title.y = element_text(face="bold", angle=90, size=12, vjust=0.2),
+                  axis.title.x = element_text(face="bold", size=12, vjust=0),
+                  axis.text.x = element_text(face="bold", colour = "black", angle=90, size=12, vjust=0.2, hjust =1 ),
+                  axis.text.y = element_text(face="bold", colour = "black"),
+                  axis.ticks = element_line(colour = "black"),
+                  axis.line = element_line(colour = "black"))
+  
+  return(p)
+}
+
+p=plot_pca(v2$E)
+p
+
+```
+
+
+Estimating within sample and within stage correlation:
+
+
+```{r correlation, echo=FALSE}
+
+#create sample info table
+
+sample_info=as.data.frame(cbind(stages,samples))
+
+
+
+dupcor_sample <- duplicateCorrelation(v2,design1,block=sample_info$samples)
+dupcor_sample$consensus.correlation
+
+dupcor_stage <- duplicateCorrelation(v2,design1,block=sample_info$stages)
+dupcor_stage$consensus.correlation
+
+```
+
+
+The within sample correlation is `r dupcor_sample$consensus.correlation`
+The within stage correlation is `r dupcor_stage$consensus.correlation`
+
+Differential expression analysis:
+
+
+```{r DE, echo=FALSE, fig.width=9, fig.height=9}
+############# differential expression for all stages ################
+
+fit = lmFit(v2,design1)
+fit2 = contrasts.fit(fit, contrast.matrix)
+fit2 = eBayes(fit2)
+alltable <- topTable(fit2, sort="F", number=nrow(dge_cc$counts))
+
+
+
+# write.csv(alltable,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts/contrasts_as_Martijn/260916_diff_expression_results.csv")
+
+#get max conditions per gene
+maxVals <- apply(alltable,1,function(x) which.max(x[5:11]))
+
+#find significant genes per stage
+#iPSC stage are all those where the max coefficient in all is < 0
+sig_iPSC_stage <- alltable[rowSums(alltable[,5:11] < 0) == 7 & alltable$adj.P.Val < 0.01,]
+sig_DE_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 1,]
+sig_PGT_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 2,]
+sig_PFG_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 3,]
+sig_PE_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 4,]
+sig_EP_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 5,]
+sig_EN6_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 6,]
+sig_EN7_stage <- alltable[rowSums(alltable[,5:11] < 0) < 7 & alltable$adj.P.Val < 0.01 & maxVals == 7,]
+
+
+# subset relevant information for each table
+logFC_iPSC_stage= apply(sig_iPSC_stage[5:11],1,function(x) min(x))####### logFC for iPSC is abs[lowest value for all other stages]
+
+DE_sig_stage <- list()
+sig_iPSC_stage <- cbind(sig_iPSC_stage[c(1:4)],as.data.frame(abs(logFC_iPSC_stage)),sig_iPSC_stage[15])
+colnames(sig_iPSC_stage)=c(colnames(sig_iPSC_stage[c(1:4)]),"logFC","adj.P.Val")
+DE_sig_stage[["iPSC"]] <- sig_iPSC_stage
+
+sig_DE_stage <- sig_DE_stage[c(1:5,15)]
+colnames(sig_DE_stage)=c(colnames(sig_DE_stage[c(1:4)]),"logFC","adj.P.Val")
+DE_sig_stage[["DE"]] <- sig_DE_stage
+
+sig_PGT_stage <- sig_PGT_stage[c(1:4,6,15)]
+colnames(sig_PGT_stage)=c(colnames(sig_PGT_stage[c(1:4)]),"logFC","adj.P.Val")
+DE_sig_stage[["PGT"]] <- sig_PGT_stage
+
+sig_PFG_stage <- sig_PFG_stage[c(1:4,7,15)]
+colnames(sig_PFG_stage)=c(colnames(sig_PFG_stage[c(1:4)]),"logFC","adj.P.Val")
+DE_sig_stage[["PFG"]] <- sig_PFG_stage
+
+sig_PE_stage <- sig_PE_stage[c(1:4,8,15)]
+colnames(sig_PE_stage)=c(colnames(sig_PE_stage[c(1:4)]),"logFC","adj.P.Val")
+DE_sig_stage[["PE"]] <- sig_PE_stage
+
+sig_EP_stage <- sig_EP_stage[c(1:4,9,15)]
+colnames(sig_EP_stage)=c(colnames(sig_EP_stage[c(1:4)]),"logFC","adj.P.Val")
+DE_sig_stage[["EP"]] <- sig_EP_stage
+
+sig_EN6_stage <- sig_EN6_stage[c(1:4,10,15)]
+colnames(sig_EN6_stage)=c(colnames(sig_EN6_stage[c(1:4)]),"logFC","adj.P.Val")
+DE_sig_stage[["EN6"]] <- sig_EN6_stage
+
+sig_EN7_stage <- sig_EN7_stage[c(1:4,11,15)]
+colnames(sig_EN7_stage)=c(colnames(sig_EN7_stage[c(1:4)]),"logFC","adj.P.Val")
+DE_sig_stage[["EN7"]] <- sig_EN7_stage
+
+  
+
+write.csv(sig_iPSC_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_iPSC_diff_expression_maxvals_contrasts_results.csv",sep=""))
+write.csv(sig_DE_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_DE_diff_expression_maxvals_contrasts_results.csv",sep=""))
+write.csv(sig_PGT_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_PGT_diff_expression_maxvals_contrasts_results.csv",sep=""))
+write.csv(sig_PFG_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_PFG_diff_expression_maxvals_contrasts_results.csv",sep=""))
+write.csv(sig_PE_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_PE_diff_expression_maxvals_contrasts_results.csv",sep=""))
+write.csv(sig_EP_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_EP_diff_expression_maxvals_contrasts_results.csv",sep=""))
+write.csv(sig_EN6_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_EN6_diff_expression_maxvals_contrasts_results.csv",sep=""))
+write.csv(sig_EN7_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_EN7_diff_expression_maxvals_contrasts_results.csv",sep=""))
+
+# select genes with logFC>1 and save
+
+for(i in names(DE_sig_stage)){
+  
+  DE_sig_stage[[i]]=DE_sig_stage[[i]][which(DE_sig_stage[[i]][[5]] > 1),]
+  write.csv(DE_sig_stage[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_",i,"_diff_expression_maxvals_contrasts_results_logFC1.csv",sep=""))
+}
+
+# save longitudinal plots
+
+   tpm=as.data.frame(read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/other_counts/27.07.2016.Differentiation_v2.gene.tpm.tsv"))   # read tpm file for plotting   longitudinal tpm data
+   tpm$GeneID <- gsub("(ENSG[0-9]+).*", "\\1", tpm$GeneID) # cut everything after the dot
+   
+   samples=as.factor(donors)
+   samples=rep(samples,8)
+   
+   
+   #order the columns by stage
+     order_by_stage=function(x,.stage=stage){
+       
+       nc=x[ , grepl( "iPSC" , names( x ) ) ]  #takes columns whose name matches x
+       
+       #Do the same for the other stages
+       
+       for (s in stage[-1])  {         
+         
+         i= x[ , grepl( s , names( x ) ) ]
+         nc=cbind(nc,i)
+       }
+       
+       x=cbind(x[c(1:2)],nc)
+       return(x)
+     }
+     stage_2= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")  #shortening EN names
+
+   make_long_plots=function(y,.tpm=tpm,.samples=samples,n=9,.stage_2=stage_2,name){
+     
+     plot_long=y[1:n,1:2]   # keep id and names to plot longitudinal variation of these top n genes 
+     
+     plot_long=tpm[match(plot_long$ensembl_gene_id,tpm$GeneID),]
+     
+     
+     
+     plot_long=order_by_stage(plot_long)
+     
+     # melt data for ggplot2
+     
+     long = melt(plot_long, measure.vars = c(3:26))
+     
+     
+     # rename stages and samples
+     
+     long$variable=rep(stage_2,each=n*3)
+     colnames(long)[which(names(long) == "variable")] <- "stage"
+     long$sample=rep(samples,each=n)
+     long$stage <- factor(long$stage, levels=stage_2)
+     long$sample=as.factor(long$sample)
+     
+     
+   
+      # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/contrasts/with_correlation/Diff_v2_top9genes_long_plots",name,sep="_"), type="cairo",
+      #      width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
+     p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +ylab("transcript per million")  +
+       geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes (contrasts):",name)) +
+     theme( axis.text.x  = element_text(angle=60, vjust=0.5, size=12))
+     
+     ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/contrasts/Diff_v2_top9genes_long_plots_contrasts",name,currentDate,".jpg",sep="_"),p,width=8,height=8,units="in",dpi=300)
+   
+     
+     return(p)
+   }
+   
+   
+   # create list of dataframes 
+   
+   tests=list(sig_iPSC_stage,sig_DE_stage,sig_PGT_stage,sig_PFG_stage,sig_PE_stage,sig_EP_stage,sig_EN6_stage,sig_EN7_stage)
+
+   for(i in 1:8){
+     
+     p=make_long_plots(tests[[i]],name=stage[i])
+     print(p)
+   }
+    
+     
+     
+
+
+```
