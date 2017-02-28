@@ -84,58 +84,56 @@ plot_pca=function(x,s=samples,st=stages){
 }
 
 
-   #order the columns by stage
-     order_by_stage=function(x,.stage=stages_longplot ){
-       
-       nc=x[ , grepl( "iPSC" , names( x ) ) ]  #takes columns whose name matches x
-       
-       #Do the same for the other stages
-       
-       for (s in .stage[-1])  {         
-         
-         i= x[ , grepl( s , names( x ) ) ]
-         nc=cbind(nc,i)
-       }
-       
-       x=cbind(x[c(1:2)],nc)
-       return(x)
-     }
-
-   make_long_plots=function(y,.tpm=tpm,.samples=samples,n=9,name){
-     
-     plot_long=y[1:n,1:2]   # keep id and names to plot longitudinal variation of these top n genes 
-     
-     plot_long=tpm[match(plot_long$ensembl_gene_id,tpm$GeneID),]
-     
-     
-     
-     plot_long=order_by_stage(plot_long)
-     
-     # melt data for ggplot2
-     
-     long = melt(plot_long, measure.vars = c(3:26))
-     
-     
-     # rename stages and samples
-     stage_2= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")  #shortening EN names
-     long$variable=rep(stage_2,each=n*3)
-     colnames(long)[which(names(long) == "variable")] <- "stage"
-     long$sample=rep(samples,each=n)
-     long$stage <- factor(long$stage, levels=stage_2)
-     long$sample=as.factor(long$sample)
-     
-     
+#order the columns by stage
+order_by_stage=function(x,.stage=stages_longplot ){
   
-      # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_top20genes_long_plots",currentDate,name,"vs_others.tiff",sep="_"), type="cairo",
-          # width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
-     p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +ylab("transcript per million")  +
-       geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes:",name,"vs other stages")) +
-     theme( axis.text.x  = element_text(angle=60, vjust=0.5, size=12))
-     
-    ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_top9genes_nocontrasts",name,currentDate,".jpg",sep="_"),p,width=8,height=8,units="in",dpi=300)
-     
-     return(p)
-   }  # function for printing the long plots
+  nc=x[ , grepl( "iPSC" , names( x ) ) ]  #takes columns whose name matches x
+  
+  #Do the same for the other stages
+  
+  for (s in .stage[-1])  {         
+    
+    i= x[ , grepl( s , names( x ) ) ]
+    nc=cbind(nc,i)
+  }
+  
+  x=cbind(x[c(1:2)],nc)
+  return(x)
+}
+
+make_long_plots=function(y,.tpm=tpm,.samples=samples,n=9,name){
+  
+  plot_long=y[1:n,1:2]   # keep id and names to plot longitudinal variation of these top n genes 
+  
+  plot_long=tpm[match(plot_long$ensembl_gene_id,tpm$GeneID),]
+  
+  
+  
+  plot_long=order_by_stage(plot_long)
+  
+  # melt data for ggplot2
+  
+  long = melt(plot_long, measure.vars = c(3:26))
+  
+  
+  # rename stages and samples
+  stage_2= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")  #shortening EN names
+  long$variable=rep(stage_2,each=n*3)
+  colnames(long)[which(names(long) == "variable")] <- "stage"
+  long$sample=rep(samples,each=n)
+  long$stage <- factor(long$stage, levels=stage_2)
+  long$sample=as.factor(long$sample)
+  
+  
+  
+  p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +ylab("transcript per million")  +
+    geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes:",name,"vs other stages")) +
+    theme( axis.text.x  = element_text(angle=60, vjust=0.5, size=12))
+  
+  ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/DEA/top_DE_genes/top9genes_stage_specific",name,currentDate,".jpg",sep="_"),p,width=8,height=8,units="in",dpi=300)
+  
+  return(p)
+}  # function for printing the long plots
 
 
 # files
@@ -351,59 +349,27 @@ for (i in colnames(d)) {
    rownames(sig_EN7_stage)=NULL 
    DE_stages [["EN7"]]<-sig_EN7_stage
    
-   set.caption("Top DE genes for iPSC")
-   pandoc.table(head(sig_iPSC_stage),split.table = Inf)
-   set.caption("Top DE genes for DE")
-   pandoc.table(head(sig_DE_stage),split.table = Inf)
-   set.caption("Top DE genes for PGT")
-   pandoc.table(head(sig_PGT_stage),split.table = Inf)
-   set.caption("Top DE genesfor PFG")
-   pandoc.table(head(sig_PFG_stage),split.table = Inf)
-   set.caption("Top DE genes for PE")
-   pandoc.table(head(sig_PE_stage),split.table = Inf)
-   set.caption("Top DE genes for EP")
-   pandoc.table(head(sig_EP_stage),split.table = Inf)
-   set.caption("Top DE genes for EN6")
-   pandoc.table(head(sig_EN6_stage),split.table = Inf)
-   set.caption("Top DE genes for EN7")
-   pandoc.table(head(sig_EN7_stage),split.table = Inf)
+   # for logFC>1 (keep in mind this is not how they do it in limma package manual!):
    
+    DE_stages_logFC1<-list()  
+    for(i in names(DE_stages)){
+      DE_stages_logFC1[[i]] = DE_stages[[i]][which(DE_stages[[i]][[5]] > 1),]
+    }
+    rm(DE_stages)
 ### Longitudinal plots of top DE genes for each stage
-   
-   
+    
   stages_longplot=c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7")
    
- for(i in names(DE_stages)){   # loop trhough list of dataframes to plot
+   
+ for(i in names(DE_stages_logFC1)){   # loop trhough list of dataframes to plot
    print(i)
-   p= make_long_plots(DE_stages[[i]],name=i)
+   p= make_long_plots(DE_stages_logFC1[[i]],name=i)
    print(p)
  }
  
-   
-  
-   #### saving results in tables
-   
-   
-   # save results as they are:
-   # 
-   # for (i in names(DE_stages)){
-   #   write.csv(DE_stages[i],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/",currentDate,"_sig_maxvals_",i,"_diff_expression_results.csv",sep=""))
-   #  
-   # }
-   
-   
-   # for adj p-vals<0.01 and logFC>1 (keep in mind this is not how they do it in limma package manual!):
-   
-    DE_stages_logFC1<-list()  
-    
-    for(i in names(DE_stages)){
-      
-      DE_stages_logFC1[[i]] = DE_stages[[i]][which(DE_stages[[i]][[5]] > 1),]
-    }
-    
     
    for (i in names(DE_stages_logFC1)){
-     write.csv(DE_stages_logFC1[i],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/",currentDate,"_sig_maxvals_",i,"_diff_expression_results_logFC1.csv",sep=""))
+     write.csv(DE_stages_logFC1[i],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/peak/",currentDate,"_sig_maxvals_",i,"_diff_expression_results_logFC1.csv",sep=""))
     
    }
    
