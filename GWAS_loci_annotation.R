@@ -168,6 +168,9 @@ for(s in stage){
                                                                            currentDate,"_allinfo_DEA_maxvals_logFC1_150kbs_around_GWAS_loci_",s,".tsv",sep=""),sep="\t")
 }
 
+table_150=read.table(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/2016-11-02_genes_and_lincRNA150kbs_around_GWAS_loci_glycemic_and_T2D.tsv",sep=""),sep="\t",header=T)
+table_50=read.table(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/2016-11-02_genes_and_lincRNA50kbs_around_GWAS_loci_glycemic_and_T2D.tsv",sep=""),sep="\t",header=T)
+table_100=read.table(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/2016-11-02_genes_and_lincRNA100kbs_around_GWAS_loci_glycemic_and_T2D.tsv",sep=""),sep="\t",header=T)
 
 
 
