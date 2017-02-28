@@ -82,7 +82,7 @@ all_ensembl_info_cc <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name
                           filters = 'ensembl_gene_id', values = rownames(counts_cc), mart = ensembl)
 rownames(all_ensembl_info_cc) <- all_ensembl_info_cc$ensembl_gene_id
 
-counts_cc <- counts_cc[all_ensembl_info_cc$ensembl_gene_id,] #keep genes in counts whose geneID still exists in Ensembl
+counts_cc <- counts_cc[all_ensembl_info_cc$ensembl_gene_id,] #keep genes in counts whose Ensembl geneID still exists in current genome build. 52699 remaining
 
 ```
 
