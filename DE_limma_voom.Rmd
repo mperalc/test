@@ -263,7 +263,7 @@ Principal component analysis, similar to MDS:
 # tried for different designs: exactly the same
 par(mfrow=c(1,1))
 plot_pca=function(x,s=samples,st=stages){
-  pca1<-prcomp(t(x), retx=TRUE)
+  pca1<-prcomp(t(x), retx=TRUE) # transpose so that samples are in rows, and genes/peaks, etc in columns
   
   plot(pca1, type = "l") #variance vs first 10 components
   summary(pca1)          #importance of each component (important line is "proportion of variance")
