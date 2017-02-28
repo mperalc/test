@@ -41,7 +41,7 @@ stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7") # 8 stages
 
 
    
-tpm=as.data.frame(read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/other_counts/27.07.2016.Differentiation_v2.gene.tpm.tsv"))   # read tpm file for plotting   longitudinal tpm data
+tpm=as.data.frame(read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/31.01.2017.Differentiation_v2.gene.tpm.tsv"))   # read tpm file for plotting   longitudinal tpm data
 tpm$GeneID <- gsub("(ENSG[0-9]+).*", "\\1", tpm$GeneID) # cut everything after the dot
    
 
@@ -67,7 +67,7 @@ Now I'll create the design matrix.
 samples <- c(rep(donors,8))   # create the design matrix
 samples=as.factor(samples)
 stages <-rep(stage,each=3) 
-stages <- as.factor(stages)
+stages <- factor(stages,levels = stage)
 design1 <- model.matrix(~stages + samples)                    
 kable(design1)
 ```
@@ -91,7 +91,7 @@ For the linear model, I'll do a voom transformation. It uses the experiment desi
 ```{r voom normalization, echo=FALSE}
 
 
-v2=voom(dge_cc,design=design_iPSC,plot=TRUE)    #iPSC vs other stages
+v2=voom(dge_cc,design=design1,plot=TRUE)    #iPSC vs other stages
 # This converts the counts to log-counts per million with associated precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data.
 
 par(mfrow=c(1,2))
@@ -303,10 +303,11 @@ Differential expression analysis:
 
 
 d=as.data.frame(design1)
+# add iPSC now
+# stagesDE=as.factor(c(0,0,0,1,1,1, rep(0,18)))  # add DE to design matrix, because the function to make it ignores this (is the baseline)
+# d=cbind(d,stagesDE)
+# d=d[c(1,5,11,8,7,6,4,2,3)] # re-order to loop through it without testing intercept or samples
 
-stagesDE=as.factor(c(0,0,0,1,1,1, rep(0,18)))  # add DE to design matrix, because the function to make it ignores this (is the baseline)
-d=cbind(d,stagesDE)
-d=d[c(1,5,11,8,7,6,4,2,3)] # re-order to loop through it without testing intercept or samples
 
 #initialize list of data frames to save them inside the loop
 
