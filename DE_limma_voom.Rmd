@@ -32,6 +32,9 @@ library(readr) # fast reading of large files
 
 currentDate <- Sys.Date() # to save date in name of output files
 
+# functions:
+
+
 load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
 
 
@@ -70,29 +73,18 @@ stages <-rep(stage,each=3)
 stages <- factor(stages,levels = stage)
 design1 <- model.matrix(~stages + samples)                    
 kable(design1)
+
 ```
 
 The base in the design matrix is sample 1 for the samples, and DE for the stages (they don't appear on the design matrix because it has all the information now about all the samples and stages). This design matrix has the information for every stage. But if I want to test 1 stage vs all others, I could create from that a simplified matrix. For example, for iPSC:
-
-```{r simple design matrix, echo=FALSE}
-
-d=as.data.frame(design1)
-test_iPSc=as.factor(d$stagesiPSC)    # for iPSC. Here I am testing 1 stage (with all samples) vs all the other stages
-
-design_iPSC=model.matrix(~samples+test_iPSc)
-
-kable(design_iPSC)
-
-```
 
 For the linear model, I'll do a voom transformation. It uses the experiment design matrix, and produces an EList object using normalised data to convert the read counts to log2-cpm, with associated weights, ready for linear modelling.The limma-voom method assumes that rows with zero or very low counts have been removed. For design matrix with iPSC only:
 
 
 ```{r voom normalization, echo=FALSE}
 
-
-v2=voom(dge_cc,design=design1,plot=TRUE)    #iPSC vs other stages
-# This converts the counts to log-counts per million with associated precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data.
+v=voom(dge_cc,design=design1,plot=TRUE)   
+# This converts the counts to log2-counts per million with associated precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data.
 
 par(mfrow=c(1,2))
 plot(log2(dge_cc$counts + 1)[,1:2],
@@ -111,106 +103,13 @@ plot(density(as.numeric(unlist(v2$E[random_sample,]))), main="voom norm counts",
 ```
 I have plotted the untransformed and the log2 transformed counts for a random sample of 50 genes across the 24 samples. Most genes have ~1000 counts (log2=10). The count data follows a skewed distribution with a large dynamic range and a large tail of “extreme values” to the right of the distribution. The voom transformed values have negative values, compared to the log2 transformed ones, because it transforms to log2 of cpm. If we transform our counts to cpm and then log2 we see very similar numbers.
 
-
-Including in the design matrix all stages:
-
-```{r voom normalization all, echo=FALSE}
-
-par(mfrow=c(1,1))
-v1=voom(dge_cc,design=design1,plot=TRUE)  #with all samples and stages
-
-```
-
-
-There is very high biological variation due to systematic differences between stages and samples. Why is the variation lower than with just one stage?
 Before fitting the linear model, I'll perform multi-dimensional scaling:  Plot samples on a two-dimensional scatterplot so that distances on the plot approximate the typical log2 fold changes between the samples (MDS).
 
 
 ```{r mds, echo=FALSE, fig.width=7, fig.height=7}
 
-#function wrap so that plotMDS doesn't produce a plot when called:
-plotMDS.invisible <- function(...){
-    ff <- tempfile()
-    png(filename=ff)
-    res <- plotMDS(...)
-    dev.off()
-    unlink(ff)
-    res
-}
 
-pretty_mds=function(v2){
-  mds_p=plotMDS.invisible(v2$E,gene.selection = "pairwise")    # pairwise method (default)
-  mds_c=plotMDS.invisible(v2$E,gene.selection = "common")      #common method 
-  
-  
-  # Rearrange data for ggplot
-  
-  # method: pairwise
-  m_p=as.data.frame(mds_p$cmdscale.out)
-  m_p <- cbind(m_p,sample=samples,stage=stages)
-  colnames(m_p)=c("Dimension 1", "Dimension 2", "Samples","Stages")
-  
-  # method: common
-  m_c=as.data.frame(mds_c$cmdscale.out)
-  m_c <- cbind(m_c,sample=samples,stage=stages)
-  colnames(m_c)=c("Dimension 1", "Dimension 2", "Samples","Stages")
-  
-  
-  # plot pairwise
-  
- # if(qc_plots==TRUE){
-    #tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MDS_pairwise_only_ours.tiff", type="cairo",
-        # width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw")
-    mp=ggplot(m_p) +
-      geom_point(aes(`Dimension 1` ,`Dimension 2`), size = 2, color = 'grey') +
-      geom_label_repel(
-        aes(`Dimension 1` , `Dimension 2`, fill = factor(Samples), label = Stages),
-        fontface = 'bold', color = 'white',
-        box.padding = unit(0.25, "lines"),
-        point.padding = unit(0.25, "lines")
-      ) +
-      coord_fixed(ratio = 1.2) +
-      
-      theme_bw(base_size=20) + 
-      theme(plot.background = element_blank(),
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank() )+
-      theme(panel.border= element_rect())+
-      
-      theme(legend.position = "bottom")  +
-      ggtitle("MDS plot:pairwise method")+
-      labs(fill = "Sample")
-   # dev.off()
-    
-    # plot common
-    # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MDS_common_only_ours.tiff", type="cairo",
-    #      width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw")
-   mc= ggplot(m_c) +
-      geom_point(aes(`Dimension 1` ,`Dimension 2`), size = 2, color = 'grey') +
-      geom_label_repel(
-        aes(`Dimension 1` , `Dimension 2`, fill = factor(Samples), label = Stages),
-        fontface = 'bold', color = 'white',
-        box.padding = unit(0.25, "lines"),
-        point.padding = unit(0.25, "lines")
-      ) +
-     coord_fixed(ratio = 2) +  #fix x-y ratio
-      
-      theme_bw(base_size=20) + 
-      theme(plot.background = element_blank(),
-            panel.grid.major = element_blank(),
-            panel.grid.minor = element_blank() )+
-      theme(panel.border= element_rect())+
-      
-      theme(legend.position = "bottom")  +
-      ggtitle("MDS plot: common method")+
-      labs(fill = "Sample")
-   # dev.off()
-    
-#  }
-   return(list(mp,mc))   #return both plots as a list
-}
-
-mds_plots=pretty_mds(v2)
+mds_plots=pretty_mds(v)
 
 plot(mds_plots[[1]])
 plot(mds_plots[[2]])
