@@ -17,13 +17,23 @@ library(biomaRt)  # for gene information
 
 library(knitr)   # for kable tables
 
+# functions:
+order_by_stages=function(counts,stage.=stage){
+  nc=counts[ , grepl( "iPSC" , names( counts) ) ]  #takes columns whose name matches x
+  
+  #Do the same for the other stages
+  
+  for (s in stage.[-1])  {         
+    
+    i= counts[ , grepl( s , names( counts ) ) ]
+    nc=cbind(nc,i)
+  }
+  
+  return(nc)
+}
 
-# Working directory conservative counts:
-setwd("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/other_counts")
-
-
-cc=read_tsv("27.07.2016.Differentiation_v2.gene.counts.tsv")  # master object, is a list of matrices (24 elements, 1 per sample)
-# each element of the list is a matrix with 57915 rows (gene ids) and 17 columns (gene id, length, counts, TPM, etc)
+cc=read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/31.01.2017.Differentiation_v2.gene.counts.tsv")  # master object, is a list of matrices (24 elements, 1 per sample)
+# each element of the list is a matrix with 57820 rows (gene ids) and 26 columns (gene id, length, counts, TPM, etc)
 
 
 donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
@@ -53,22 +63,6 @@ rownames(counts_cc) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(counts_cc)) # cut 
 Conservative counts initially has `r nrow(counts_cc)` genes, and looks like this: 
 
 ```{r conservative counts, echo=FALSE, tidy=TRUE}
-
-
-order_by_stages=function(counts,stage.=stage){
-nc=counts[ , grepl( "iPSC" , names( counts) ) ]  #takes columns whose name matches x
-
-#Do the same for the other stages
-
-for (s in stage.[-1])  {         
-  
-  i= counts[ , grepl( s , names( counts ) ) ]
-  nc=cbind(nc,i)
-}
-
-return(nc)
-}
-
 
 counts_cc=order_by_stages(counts_cc)
 colnames(counts_cc)=paste( rep(stage,each=3),rep(donors,8),sep="_" )
