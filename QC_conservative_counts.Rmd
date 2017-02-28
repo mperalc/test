@@ -1,6 +1,8 @@
 ---
 title: "QC and filtering for conservative counts"
-output: html_notebook
+output:
+  html_document: default
+  html_notebook: default
 ---
 
 QC and filtering for conservative counts.
