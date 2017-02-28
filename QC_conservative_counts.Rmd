@@ -32,6 +32,36 @@ order_by_stages=function(counts,stage.=stage){
   return(nc)
 }
 
+
+trim_by_stage=function(dge){
+  data=dge$counts
+  data[data>0]=1 # convert to table where 0=0 and 1 equals any value above 0
+
+  c=c() # initiate vector of numbers, to save rows to take out of matrix
+
+  for (r in 1:nrow(data)){
+   for (i in seq(1,24,3)){   # loop through stages 3 by 3 (to jump over samples of same stage)
+    
+     if (sum(data[r,c(i,i+1,i+2)]) > 2) {
+      
+        break
+      }
+      if (i==22){
+      
+        c=c(c,r)  # if it gets to the end and there are no valid values, append to vector
+      }
+    
+    
+   }
+  
+  }
+
+rm(data)
+return(c)
+
+}
+
+
 cc=read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/31.01.2017.Differentiation_v2.gene.counts.tsv")  # master object, is a list of matrices (24 elements, 1 per sample)
 # each element of the list is a matrix with 57820 rows (gene ids) and 26 columns (gene id, length, counts, TPM, etc)
 
@@ -112,41 +142,10 @@ After trimming,  conservative counts has `r nrow(dge_cc)` genes.
 Now I want to correct the problem from the previous QC: I want to remove genes in which at least one stage has counts for ALL 3 samples.
 
 ```{r more trimming, echo=FALSE}
-
-
-
 # go through the table 3 by 3
 # if there are more than 2 values in three columns above 0, go to next row.
 # if not, go to next 3
 # if gets to end of loop and not found the values, get that row. After loop, subset matrix excluding those rows
-
-trim_by_stage=function(dge){
-  data=dge$counts
-  data[data>0]=1 # convert to table where 0=0 and 1 equals any value above 0
-
-  c=c() # initiate vector of numbers, to save rows to take out of matrix
-
-  for (r in 1:nrow(data)){
-   for (i in seq(1,24,3)){   # loop through stages 3 by 3 (to jump over samples of same stage)
-    
-     if (sum(data[r,c(i,i+1,i+2)]) > 2) {
-      
-        break
-      }
-      if (i==22){
-      
-        c=c(c,r)  # if it gets to the end and there are no valid values, append to vector
-      }
-    
-    
-   }
-  
-  }
-
-rm(data)
-return(c)
-
-}
 
 
 c=trim_by_stage(dge_cc)
@@ -156,10 +155,9 @@ ditch=dge_cc$counts[c,] # table to throw away
 
 keep=!(rownames(dge_cc$counts) %in% rownames(ditch))
 
-dge_cc <- dge_cc[keep, , keep.lib.sizes=FALSE] # counts now has 17892 genes
+dge_cc <- dge_cc[keep, , keep.lib.sizes=FALSE] # counts now has 17790 genes
     
 rm(c,keep,ditch)
-
 
 ```
 After trimming, conservative counts has `r nrow(dge_cc)` genes. Conservative counts has lost  `r genes_fail_cc` genes (`r fail_cc`% from previous total).
@@ -167,16 +165,13 @@ After trimming, conservative counts has `r nrow(dge_cc)` genes. Conservative cou
 Now I will 1) keep only lincRNA and protein coding genes, and 2) exclude mitochondrial genes and those in sex chromosomes.
 
 ``` {r even more trimming, echo=FALSE}
-
-
 #remove genes that are not annotated as lincRNA or protein_coding
 before=nrow(dge_cc)
 dge_cc <- dge_cc[which(dge_cc$genes$gene_biotype == "protein_coding" | dge_cc$genes$gene_biotype == "lincRNA"),]
 
 
-# now has 15859 genes
-# dge_cc <- dge_cc[keep, , keep.lib.sizes=FALSE] # counts now has 17892 genes
-    
+# now has 15811 genes
+
 gene_lost_step_1_cc=before-nrow(dge_cc)
 before=nrow(dge_cc)
 
@@ -184,7 +179,7 @@ before=nrow(dge_cc)
 chr <- c(1:22)
 dge_cc <- dge_cc[which(dge_cc$genes$chromosome_name %in% chr),]
 
-# now has 15280 genes
+# now has 15220 genes
 
 
 ```
