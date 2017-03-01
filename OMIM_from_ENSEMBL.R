@@ -1,5 +1,4 @@
-
-
+# annotate with OMIM information
 
 library(XML)
 library(romim)
@@ -9,7 +8,9 @@ currentDate <- Sys.Date() # to save date in name of output files
 
 
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")
-my_key <- set_key('XVfZiTjDQ5GrXDszaIIQmA')    # API key for OMIM queries
+my_key <- read.table(file="/Users/Marta/Documents/WTCHG/OMIM_key.txt")
+my_key <- as.character(my_key$V1)
+my_key <- set_key(my_key)    # API key for OMIM queries
 
 
 sig_stages=list()
