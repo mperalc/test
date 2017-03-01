@@ -4,7 +4,6 @@ currentDate <- Sys.Date() # to save date in name of output files
 
 tf = read.csv('/Users/Marta/Documents/WTCHG/DPhil/Data/TF_list_ensembl.txt',sep=",") # TF list
 
-
 # add TF yes/no column to files
 merged_GWAS_50 <- list()
 merged_GWAS_100 <- list()
