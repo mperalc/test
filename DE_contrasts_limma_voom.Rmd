@@ -51,20 +51,6 @@ for (s in donors.[-1])  {
 return(nc)
 }
 
-load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
-
-
-donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
-
-stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
-
-# order by samples, to make the design matrix clearer:
-
-
-dge_cc$counts=order_by_samples(dge_cc$counts)
-
-#same with sample matrix from dge:
-
 
 order_by_samples2=function(x,donors.= donors){
 nc=x[ grep( "Ad2.1" , rownames( x) ), ]  #takes columns whose name matches x
@@ -79,6 +65,19 @@ for (s in donors.[-1])  {
 
 return(nc)
 }
+
+load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
+
+
+donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
+
+stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
+
+# order by samples, to make the design matrix clearer:
+dge_cc$counts=order_by_samples(dge_cc$counts)
+
+#same with sample matrix from dge:
+
 
 dge_cc$samples=order_by_samples2(dge_cc$samples)
 
