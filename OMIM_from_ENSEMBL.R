@@ -18,15 +18,9 @@ sig_stages=list()
 # load files with DE results
 
 for(i in stage){
-  # sig_stages[[i]]= read.csv(paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/2016-10-17_sig_maxvals_",i,"_diff_expression_results_logFC1.csv",sep=""))
-  # colnames(sig_stages[[i]]) <- c("ensembl_gene_id", "external_gene_name","gene_biotype", "chromosome_name","logFC","adj.P.Val")
-  # 
-  sig_stages[[i]]= read.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/comparison_with_and_without_contrasts/2016-10-17_sig_", 
+  sig_stages[[i]]= read.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/comparison_with_and_without_contrasts/2017-03-01_sig_", 
                        i,"_diff_expression_maxvals_stage-unique_and_across-stages_logFC1.csv",sep=""))
-
 }
-
-
 
 # get OMIM id from ensembl id
 cols <- c("ENSEMBL","SYMBOL", "OMIM" )
@@ -58,11 +52,11 @@ my_list=lapply(my_list,function(x)x[!is.na(x)])         # remove Nas
 
 my_list_omim <-list()
 
-# for(i in stage){
-# print(system.time(my_list_omim[[i]] <- lapply(lapply(my_list[[i]], get_omim), get_title)))
-#   # get_omim gets XML result for the list of OMIM id, in order.
-#   # get_title gives as a list the phenotype titles from OMIM ids. 
-# }
+for(i in stage){
+print(system.time(my_list_omim[[i]] <- lapply(lapply(my_list[[i]], get_omim), get_title)))
+  # get_omim gets XML result for the list of OMIM id, in order.
+  # get_title gives as a list the phenotype titles from OMIM ids.
+}
 
 
 # save OMIM object to save time in each run 
@@ -97,7 +91,7 @@ for(i in stage){
   full_tables[[i]] = merge(sig_stages[[i]],mappedGenes[[i]], by="ensembl_gene_id") 
   
  # there are repeated genes, as there might be various OMIM terms associated with a certain gene 
-  write.table(full_tables[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/comparison_with_and_without_contrasts/OMIM/",
+  write.table(full_tables[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/comparison_with_and_without_contrasts/OMIM/",
                                                                    currentDate,"_sig_",i,"_DEA_maxvals_stage-unique_and_across-stages_logFC1_OMIM.tsv",sep=""),sep="\t")
   
 }
@@ -153,7 +147,7 @@ for(i in stage){
   small_table_aggr[[i]] = apply(small_table_aggr[[i]], 2, gsub, patt=",", replace=" - ") # replace commas with - for easier import in excel
   
   
-  write.table(small_table_aggr[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/comparison_with_and_without_contrasts/OMIM/",
+  write.table(small_table_aggr[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/comparison_with_and_without_contrasts/OMIM/",
                                                                  currentDate,"_sig_",i,"_DEA_maxvals_stage-unique_and_across-stages_logFC1_OMIM_interesting_terms.tsv",sep=""),sep="\t")
 }
 
