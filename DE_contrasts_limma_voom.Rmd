@@ -97,7 +97,7 @@ pretty_mds=function(v2){
   # plot pairwise
   
  # if(qc_plots==TRUE){
-    #tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MDS_pairwise_only_ours.tiff", type="cairo",
+    #tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/across-stages/Diff_v2_MDS_pairwise_only_ours.tiff", type="cairo",
         # width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw")
     mp=ggplot(m_p) +
       geom_point(aes(`Dimension 1` ,`Dimension 2`), size = 2, color = 'grey') +
@@ -121,7 +121,7 @@ pretty_mds=function(v2){
    # dev.off()
     
     # plot common
-    # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_MDS_common_only_ours.tiff", type="cairo",
+    # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/across-stages/Diff_v2_MDS_common_only_ours.tiff", type="cairo",
     #      width=10,height=10,units="in",res=300,pointsize = 13,compression="lzw")
    mc= ggplot(m_c) +
       geom_point(aes(`Dimension 1` ,`Dimension 2`), size = 2, color = 'grey') +
@@ -158,7 +158,7 @@ plot_sdc=function(x){
   rownames(sampleDistMatrix) <- paste(stages, samples, sep="-")
   colnames(sampleDistMatrix) <- NULL
   colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-  # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_Distance_clustering.tiff", type="cairo",
+  # tiff("/Users/Marta/Documents/WTCHG/DPhil/Plots/across-stages/Diff_v2_Distance_clustering.tiff", type="cairo",
   # width=10,height=8,units="in",res=300,pointsize = 13,compression="lzw") 
   sdc= pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors)
   # dev.off()
@@ -178,9 +178,12 @@ plot_pca=function(x,s=samples,st=stages){
   pcs <- cbind(pcs,sample=samples,stage=stages)
   pcs$stage <- ordered(pcs$stage, levels = stage)
   
+  diaPalette <- c("#CADAE8", "#7883BA", "#755A91", "#CC85B1", "#C15858", "#F4B8B0", "#96665A", "#6DA567")  # Diabetologia palette
+  
   p <- ggplot(pcs, aes(PC1, PC2, colour=stage, shape=samples)) + 
     geom_point(size = 3) + xlab (paste0( "PC1:" ,percentVar[ 1 ],"% variance")) + 
-    ylab (paste0( "PC2: ",percentVar[ 2 ],"% variance" ))
+    ylab (paste0( "PC2: ",percentVar[ 2 ],"% variance" )) +
+    scale_colour_manual(values=diaPalette)
   p <- p + theme(	panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
                   panel.background = element_blank(),
                   panel.border = element_rect(fill = NA, colour = "black"), 
@@ -221,7 +224,7 @@ make_long_plots=function(y,.tpm=tpm,.samples=samples,n=9,.stage_2=stage_2,name){
      
      
    
-      # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/contrasts/with_correlation/Diff_v2_top9genes_long_plots",name,sep="_"), type="cairo",
+      # tiff(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/across-stages/contrasts/with_correlation/Diff_v2_top9genes_long_plots",name,sep="_"), type="cairo",
       #      width=25,height=10,units="in",res=300,pointsize = 13,compression="lzw") 
      p <- ggplot(data = long, aes(x = stage, y = value,group=sample )) +ylab("transcript per million")  +
        geom_line(aes(col = sample), size = 1) + facet_wrap(~GeneName,ncol=3,scales="free") +ggtitle(paste("Longitudinal plots for top DE genes (contrasts):",name)) +
@@ -233,7 +236,7 @@ make_long_plots=function(y,.tpm=tpm,.samples=samples,n=9,.stage_2=stage_2,name){
      return(p)
    }
    
-   
+##### load dge object  
 
 load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",verbose=TRUE)  #loading the dge object for conservative counts
 
@@ -245,8 +248,6 @@ dge_cc$counts=order_by_samples(dge_cc$counts)
 
 #same with sample matrix from dge:
 dge_cc$samples=order_by_samples2(dge_cc$samples)
-
-
 
 ```
 
@@ -266,7 +267,7 @@ Now I'll create the design matrix.
 
 ```{r design matrix, echo=FALSE}
  
-samples <- c(rep(c("sample1","sample2","sample3"),each=8))   # create the design matrix
+samples <- c(rep(c("sample 1","sample 2","sample 3"),each=8))   # create the design matrix
 samples=as.factor(samples)
 #stages <-rep(stage,each=3) 
 stages <- c(rep(1:8,3))
@@ -297,8 +298,6 @@ For the linear model, I'll do a voom transformation. It uses the experiment desi
 
 
 ```{r voom normalization, echo=FALSE}
-
-
 v2=voom(dge_cc,design=design1,plot=TRUE)   
 # This converts the counts to log-counts per million with associated precision weights. After this, the RNA-seq data can be analyzed as if it was microarray data.
 
@@ -315,7 +314,6 @@ plot(density(as.numeric(unlist(dge_cc$counts[random_sample,]))), main="counts", 
 plot(density(as.numeric(unlist(log2(dge_cc$counts+1)[random_sample,]))), main="log2", cex.main=2)
 plot(density(as.numeric(unlist(v2$E[random_sample,]))), main="voom norm counts", cex.main=2)
 
-
 ```
 
 
@@ -326,13 +324,9 @@ Before fitting the linear model, I'll perform multi-dimensional scaling:  Plot s
 
 
 ```{r mds, echo=FALSE, fig.width=7, fig.height=7}
-
-
 mds_plots=pretty_mds(v2)
-
 plot(mds_plots[[1]])
 plot(mds_plots[[2]])
-
 
 ```
 
@@ -341,18 +335,12 @@ The distance between each pair of samples is the root-mean-square deviation (Euc
 
 In this case, we see for the "pairwise" method that EN stages cluster by stage (6 or 7) and not by sample. In the "common" method, the opposite happens. Nothing else changes much between the two plots. My interpretation is that the genes that drive the variance between all stages, that are used in the common method, are not the ones that distinguish the late EN stages. There is in reality for EN a much higher similarity between samples than between stages, and therefore the stages need to be separated by different genes (as shown in the pairwise method). Plotting the two versions shows us interesting information about the data. The "pairwise" method also shows that samples Ad2.1 and Neo1.1 are closer in EN stage 7 than sample Ad3.1. We saw from the longitudinal TPM plots of selected marker genes that sample Ad3.1 is better differentiated.
 
-Now I plot the sample distance cluster (look for the meaning of the legend):
+Now I plot the sample distance cluster:
 
 
 
 ```{r sdc, echo=FALSE, fig.width=7, fig.height=7}
-################## get sample distance cluster  ##################
-
-
 sdc_voom=plot_sdc(v2$E) 
-
-
-
 
 ```
 
@@ -363,16 +351,14 @@ Principal component analysis, similar to MDS:
 
 ```{r pca, echo=FALSE, fig.width=7, fig.height=7}
 
-
-# this gives the wrong result
-
-
 # tried for different designs: exactly the same
 par(mfrow=c(1,1))
 stages <-rep(stage,3) 
 
 p=plot_pca(v2$E)
 p
+
+ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/DEA/",currentDate,"_PCA_conservative_counts_newsamples_diabetologia.jpg",sep=""),p,width=10,height=8,units="in",dpi=300)
 
 ```
 
@@ -413,7 +399,7 @@ alltable <- topTable(fit2, sort="F", number=nrow(dge_cc$counts))
 
 
 
-# write.csv(alltable,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts/contrasts_as_Martijn/260916_diff_expression_results.csv")
+# write.csv(alltable,quote=F,row.names=F,file="/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts/260916_diff_expression_results.csv")
 
 #get max conditions per gene
 maxVals <- apply(alltable,1,function(x) which.max(x[5:11]))
@@ -467,25 +453,15 @@ colnames(sig_EN7_stage)=c(colnames(sig_EN7_stage[c(1:4)]),"logFC","adj.P.Val")
 DE_sig_stage[["EN7"]] <- sig_EN7_stage
 
   
-
-write.csv(sig_iPSC_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_iPSC_diff_expression_maxvals_contrasts_results.csv",sep=""))
-write.csv(sig_DE_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_DE_diff_expression_maxvals_contrasts_results.csv",sep=""))
-write.csv(sig_PGT_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_PGT_diff_expression_maxvals_contrasts_results.csv",sep=""))
-write.csv(sig_PFG_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_PFG_diff_expression_maxvals_contrasts_results.csv",sep=""))
-write.csv(sig_PE_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_PE_diff_expression_maxvals_contrasts_results.csv",sep=""))
-write.csv(sig_EP_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_EP_diff_expression_maxvals_contrasts_results.csv",sep=""))
-write.csv(sig_EN6_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_EN6_diff_expression_maxvals_contrasts_results.csv",sep=""))
-write.csv(sig_EN7_stage,quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_EN7_diff_expression_maxvals_contrasts_results.csv",sep=""))
-
 # select genes with logFC>1 and save
 
 for(i in names(DE_sig_stage)){
   
   DE_sig_stage[[i]]=DE_sig_stage[[i]][which(DE_sig_stage[[i]][[5]] > 1),]
-  write.csv(DE_sig_stage[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/conservative_counts/contrasts_as_Martijn/",currentDate,"_sig_",i,"_diff_expression_maxvals_contrasts_results_logFC1.csv",sep=""))
+  write.csv(DE_sig_stage[[i]],quote=F,row.names=F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/across-stages/",currentDate,"_sig_",i,"_diff_expression_maxvals_across-stages_results_logFC1.csv",sep=""))
 }
 
-# save longitudinal plots
+# longitudinal plots of top DE genes
 
    tpm=as.data.frame(read_tsv("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/other_counts/27.07.2016.Differentiation_v2.gene.tpm.tsv"))   # read tpm file for plotting   longitudinal tpm data
    tpm$GeneID <- gsub("(ENSG[0-9]+).*", "\\1", tpm$GeneID) # cut everything after the dot
@@ -505,9 +481,5 @@ for(i in names(DE_sig_stage)){
      p=make_long_plots(tests[[i]],name=stage[i])
      print(p)
    }
-    
-     
-     
-
-
+  
 ```
