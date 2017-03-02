@@ -175,12 +175,29 @@ combined_commongenes=combined_commongenes[,-1] # take out first column
 filtered_combined_commongenes=filter_counts(combined_commongenes)   # 15458 genes remaining 
 
 filtered_combined_commongenes <- calcNormFactors(filtered_combined_commongenes)    # Calculate normalization factors. TMM by default
-v2 <- voom(filtered_combined_commongenes,design,plot=F) # voom normalize the read counts
+v <- voom(filtered_combined_commongenes,design,plot=F) # voom normalize the read counts
 
 
-sdc_voom=plot_sdc(v2$E) 
+sdc_voom=plot_sdc(v$E) 
 
-p=plot_pca(v2$E)
+p=plot_pca(v$E)
 p
 ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_commongenes_PC1and2.jpg",p,width=10,height=8,units="in",dpi=300)
+
+
+
+# 
+# # top 8000 expressed genes
+# 
+# top_genes=filtered_combined_commongenes[order(rowSums(filtered_combined_commongenes$counts),decreasing=T),] # order by decreasing counts
+# top_genes=top_genes[1:8000,] # select top 8000
+# top_genes=rownames(top_genes$counts) # select gene ids
+# 
+# # select those genes from voom object to plot
+# v2=v[which(v$genes$ensembl_gene_id %in% top_genes),]
+# 
+# 
+# p=plot_pca(v2$E)
+# p
+# ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_top8000expr_commongenes_PC1and2.jpg",p,width=10,height=8,units="in",dpi=300)
 
