@@ -72,16 +72,16 @@ plot_sdc=function(x){
   
   # by default, "euclidean"
   sampleDistMatrix <- as.matrix(sampleDists)
-  rownames(sampleDistMatrix) <- paste(stages, samples, sep=" - ")
+  rownames(sampleDistMatrix) <- paste(stages, samples,c(rep("new",24),rep("old",12)), sep=" - ")
   colnames(sampleDistMatrix) <- NULL
   colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
   
-  # png("/Users/Marta/Documents/WTCHG/DPhil/Plots/Distance_clustering_new_diff_vs_Martijn_Nica_allgenes.png",
-  #  width=10,height=8,units="in",res=300,pointsize = 13)
+  png("/Users/Marta/Documents/WTCHG/DPhil/Plots/Distance_clustering_new_vs_old_diff_commongenes.png",
+    width=10,height=8,units="in",res=300,pointsize = 13)
   
   sdc= pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors)
   
-  # dev.off()
+   dev.off()
   
   return(sdc)
 }
@@ -106,7 +106,7 @@ plot_pca=function(x,s=samples,st=stages){
     geom_point(size=3, aes(fill=stage, alpha=as.character(experiment)),stroke=1) +
     geom_point(size=2.5,stroke=1.5) +      
     scale_shape_manual(values=c(22,24,25,21)) +
-    scale_alpha_manual(values=c("old"=0, "new"=1),name="experiment") +
+    scale_alpha_manual(values=c("old"=0, "new"=1),name="experiment",guide="none") + # guide="none" takes out legend for this alpha
     xlab (paste0( "PC1:" ,percentVar[ 1 ],"% variance")) + 
     ylab (paste0( "PC2: ",percentVar[ 2 ],"% variance" ))
   
@@ -184,6 +184,84 @@ p=plot_pca(v$E)
 p
 ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_commongenes_PC1and2.jpg",p,width=10,height=8,units="in",dpi=300)
 
+# other PCs
+
+pca1<-prcomp(t(v$E), retx=TRUE)
+
+percentVar <- (pca1$sdev)^2 / sum(pca1$sdev^2)
+percentVar <- round(100 * percentVar)
+pcs <- as.data.frame(pca1$x)
+pcs <- cbind(pcs,sample=samples,stage=stages,experiment=c(rep("new",24),rep("old",12)))
+levels(pcs$stage) <- c(levels(pcs$stage), c("EN","BLC"))  # change name of stages, first increase levels of factor
+pcs[which(pcs$stage=="ENstage6"),"stage"] <- "EN" 
+pcs[which(pcs$stage=="ENstage7"),"stage"] <- "BLC"
+pcs <- droplevels(pcs)  # drop unused levels (old names)
+
+pcs$stage <- ordered(pcs$stage, levels = c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN", "BLC") ) # order levels, for colours
+
+
+p <- ggplot(pcs,aes(x=PC2,y=PC3, color=stage, shape=sample)) +
+  geom_point(size=3, aes(fill=stage, alpha=as.character(experiment)),stroke=1) +
+  geom_point(size=2.5,stroke=1.5) +      
+  scale_shape_manual(values=c(22,24,25,21)) +
+  scale_alpha_manual(values=c("old"=0, "new"=1),name="experiment") +
+  xlab (paste0( "PC2:" ,percentVar[ 2 ],"% variance")) + 
+  ylab (paste0( "PC3: ",percentVar[ 3 ],"% variance" ))
+
+
+p <- p + theme(   panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+                  panel.background = element_blank(),
+                  panel.border = element_rect(fill = NA, colour = "black"), 
+                  legend.key = element_blank(),# legend.position = c(0.5,0.5),
+                  axis.title.y = element_text(face="bold", angle=90, size=12, vjust=0.2),
+                  axis.title.x = element_text(face="bold", size=12, vjust=0),
+                  axis.text.x = element_text(face="bold", colour = "black", angle=90, size=12, vjust=0.2, hjust =1 ),
+                  axis.text.y = element_text(face="bold", colour = "black"),
+                  axis.ticks = element_line(colour = "black"),
+                  axis.line = element_line(colour = "black"))
+
+plot(p)
+
+ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_commongenes_PC2and3.jpg",p,width=10,height=8,units="in",dpi=300)
+
+
+pca1<-prcomp(t(v$E), retx=TRUE)
+
+percentVar <- (pca1$sdev)^2 / sum(pca1$sdev^2)
+percentVar <- round(100 * percentVar)
+pcs <- as.data.frame(pca1$x)
+pcs <- cbind(pcs,sample=samples,stage=stages,experiment=c(rep("new",24),rep("old",12)))
+levels(pcs$stage) <- c(levels(pcs$stage), c("EN","BLC"))  # change name of stages, first increase levels of factor
+pcs[which(pcs$stage=="ENstage6"),"stage"] <- "EN" 
+pcs[which(pcs$stage=="ENstage7"),"stage"] <- "BLC"
+pcs <- droplevels(pcs)  # drop unused levels (old names)
+
+pcs$stage <- ordered(pcs$stage, levels = c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN", "BLC") ) # order levels, for colours
+
+
+p <- ggplot(pcs,aes(x=PC1,y=PC3, color=stage, shape=sample)) +
+  geom_point(size=3, aes(fill=stage, alpha=as.character(experiment)),stroke=1) +
+  geom_point(size=2.5,stroke=1.5) +      
+  scale_shape_manual(values=c(22,24,25,21)) +
+  scale_alpha_manual(values=c("old"=0, "new"=1),name="experiment") +
+  xlab (paste0( "PC1:" ,percentVar[ 1 ],"% variance")) + 
+  ylab (paste0( "PC3: ",percentVar[ 3 ],"% variance" ))
+
+
+p <- p + theme(   panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
+                  panel.background = element_blank(),
+                  panel.border = element_rect(fill = NA, colour = "black"), 
+                  legend.key = element_blank(),# legend.position = c(0.5,0.5),
+                  axis.title.y = element_text(face="bold", angle=90, size=12, vjust=0.2),
+                  axis.title.x = element_text(face="bold", size=12, vjust=0),
+                  axis.text.x = element_text(face="bold", colour = "black", angle=90, size=12, vjust=0.2, hjust =1 ),
+                  axis.text.y = element_text(face="bold", colour = "black"),
+                  axis.ticks = element_line(colour = "black"),
+                  axis.line = element_line(colour = "black"))
+
+plot(p)
+
+ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_commongenes_PC1and3.jpg",p,width=10,height=8,units="in",dpi=300)
 
 
 # 
