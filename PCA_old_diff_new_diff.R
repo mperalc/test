@@ -175,10 +175,12 @@ combined_commongenes=combined_commongenes[,-1] # take out first column
 filtered_combined_commongenes=filter_counts(combined_commongenes)   # 15458 genes remaining 
 
 filtered_combined_commongenes <- calcNormFactors(filtered_combined_commongenes)    # Calculate normalization factors. TMM by default
+# save as an object for later analyses
+#save(filtered_combined_commongenes, file = "/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_old_and_new_filtered.xz" , compress="xz")
+
 v <- voom(filtered_combined_commongenes,design,plot=F) # voom normalize the read counts
 
-# save as an object for later analyses
-#save(v, file = "voom_old_vs_new_diff.xz" , compress="xz")
+
 
 sdc_voom=plot_sdc(v$E) 
 
