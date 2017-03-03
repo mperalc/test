@@ -177,6 +177,8 @@ filtered_combined_commongenes=filter_counts(combined_commongenes)   # 15458 gene
 filtered_combined_commongenes <- calcNormFactors(filtered_combined_commongenes)    # Calculate normalization factors. TMM by default
 v <- voom(filtered_combined_commongenes,design,plot=F) # voom normalize the read counts
 
+# save as an object for later analyses
+#save(v, file = "voom_old_vs_new_diff.xz" , compress="xz")
 
 sdc_voom=plot_sdc(v$E) 
 
