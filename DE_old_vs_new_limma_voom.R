@@ -65,14 +65,34 @@ for(s in old_stages){
   
   design3=design[grepl( s , rownames( design) ),c(1,2)]  # same with design matrix
   
+  # keep genes that have cpm>1 from voom object in all samples in either experiment old or new in the stage we are checking
+  cpm_stage=cpm(filtered_combined_commongenes)  # calculate cpm
+  cpm_stage=cpm_stage[,grepl(s , colnames(cpm_stage))]  # select columns from stage
+
+  cpm_stage[cpm_stage<1]=0  # change to binary to make the selection easier
+  cpm_stage[cpm_stage>=1]=1
+  keep_genes=names(which(rowSums(cpm_stage[,c(1:3)])==3 | rowSums(cpm_stage[,c(4:5)])==2))  # select genes that pass filter
+  v3=v3[keep_genes,]
+  
+  # raise filter to 10 cpm
+  # # 
+  # cpm_stage=cpm(filtered_combined_commongenes)  # calculate cpm
+  # cpm_stage=cpm_stage[,grepl(s , colnames(cpm_stage))]  # select columns from stage
+  # 
+  # cpm_stage[cpm_stage<10]=0  # change to binary to make the selection easier
+  # cpm_stage[cpm_stage>=10]=1
+  # keep_genes=names(which(rowSums(cpm_stage[,c(1:3)])==3 | rowSums(cpm_stage[,c(4:5)])==2))  # select genes that pass filter
+  # v3=v3[keep_genes,]
+  # 
+  ###
   fit3 <- lmFit(v3,design3)
   fit3 <- eBayes(fit3)
   
   diff_exp3=topTable(fit3,coef=ncol(design3),sort.by = "none",number=nrow(fit3$coefficients))  
-  diff_exp_allstages_nominal[[s]]=diff_exp3[which(diff_exp3$P.Value<0.05 & (diff_exp3$logFC>1 | diff_exp3$logFC<(-1))),]
-  diff_exp_allstages[[s]]=diff_exp3[which(diff_exp3$adj.P.Val<0.05 & (diff_exp3$logFC>1 | diff_exp3$logFC<(-1))),]  #pval<0.01 and logFC>1
-  write.csv(diff_exp_allstages[[s]],file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/comparison_old_and_new_study/",currentDate,"_diff_exp_old_vs_new_protocol_",s,"_stage_5percent_pval.csv",sep=""),
-            row.names = F)
+  diff_exp_allstages_nominal[[s]]=diff_exp3[which(diff_exp3$P.Value<0.01 & (diff_exp3$logFC>1 | diff_exp3$logFC<(-1))),]
+  diff_exp_allstages[[s]]=diff_exp3[which(diff_exp3$adj.P.Val<0.01 & (diff_exp3$logFC>1 | diff_exp3$logFC<(-1))),]  #pval<0.01 and logFC>1
+  # write.csv(diff_exp_allstages[[s]],file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/comparison_old_and_new_study/",currentDate,"_diff_exp_old_vs_new_protocol_",s,"_stage_1percent_adjpval_1cpm.csv",sep=""),
+  #          row.names = F)
   
 }
 
