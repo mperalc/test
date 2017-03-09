@@ -76,7 +76,7 @@ plot_sdc=function(x){
   colnames(sampleDistMatrix) <- NULL
   colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
   
-  png("/Users/Marta/Documents/WTCHG/DPhil/Plots/Distance_clustering_new_vs_old_diff_commongenes.png",
+  png("/Users/Marta/Documents/WTCHG/DPhil/Plots/Distance_clustering_new_vs_old_diff_commongenes_75bp.png",
     width=10,height=8,units="in",res=300,pointsize = 13)
   
   sdc= pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors)
@@ -148,7 +148,11 @@ colnames(cc)=paste( rep(stage,each=3),rep(donors,8),sep="_" )  # rename columns
 
 
 # old diff data
-old_diff=read.table("/Users/marta/Documents/WTCHG/DPhil/Data/Diff_v2/Martijn_paper_newcounts/31.01.2017.Islets_paper_data_2016.gene.counts.tsv",header=T,check.names=F,row.names=1)
+# 100bp read
+#old_diff=read.table("/Users/marta/Documents/WTCHG/DPhil/Data/Diff_v2/Martijn_paper_newcounts/31.01.2017.Islets_paper_data_2016.gene.counts.tsv",header=T,check.names=F,row.names=1)
+#75 bp read
+old_diff=read.table("/Users/marta/Documents/WTCHG/DPhil/Data/Diff_v2/Martijn_paper_newcounts/trim_75bp/09.03.2017.trim_75bp.gene.counts.tsv",header=T,check.names=F,row.names=1)
+
 old_diff <- old_diff[,13:ncol(old_diff)]
 #cut the version number of the Ensembl IDs
 rownames(old_diff) <- gsub("(ENSG[0-9]+).*", "\\1", rownames(old_diff))
@@ -176,7 +180,7 @@ filtered_combined_commongenes=filter_counts(combined_commongenes)   # 15458 gene
 
 filtered_combined_commongenes <- calcNormFactors(filtered_combined_commongenes)    # Calculate normalization factors. TMM by default
 # save as an object for later analyses
-#save(filtered_combined_commongenes, file = "/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_old_and_new_filtered.xz" , compress="xz")
+save(filtered_combined_commongenes, file = "/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_old_and_new_filtered_75bp.xz" , compress="xz")
 
 v <- voom(filtered_combined_commongenes,design,plot=F) # voom normalize the read counts
 
@@ -186,7 +190,7 @@ sdc_voom=plot_sdc(v$E)
 
 p=plot_pca(v$E)
 p
-ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_commongenes_PC1and2.jpg",p,width=10,height=8,units="in",dpi=300)
+ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_75bp_commongenes_PC1and2.jpg",p,width=10,height=8,units="in",dpi=300)
 
 # other PCs
 
