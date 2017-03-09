@@ -101,12 +101,15 @@ plot_pca=function(x,s=samples,st=stages){
   
   pcs$stage <- ordered(pcs$stage, levels = c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN", "BLC") ) # order levels, for colours
   
+  diaPalette <- c("#CADAE8", "#7883BA", "#755A91", "#CC85B1", "#C15858", "#F4B8B0", "#96665A", "#6DA567")  # Diabetologia palette
   
   p <- ggplot(pcs,aes(x=PC1,y=PC2, color=stage, shape=sample)) +
     geom_point(size=3, aes(fill=stage, alpha=as.character(experiment)),stroke=1) +
     geom_point(size=2.5,stroke=1.5) +      
     scale_shape_manual(values=c(22,24,25,21)) +
-    scale_alpha_manual(values=c("old"=0, "new"=1),name="experiment",guide="none") + # guide="none" takes out legend for this alpha
+    scale_alpha_manual(values=c("old"=0, "new"=diaPalette),name="experiment",guide="none") + # guide="none" takes out legend for this alpha
+    scale_colour_manual(values=diaPalette) +
+    scale_fill_manual(values=diaPalette) +
     xlab (paste0( "PC1:" ,percentVar[ 1 ],"% variance")) + 
     ylab (paste0( "PC2: ",percentVar[ 2 ],"% variance" ))
   
@@ -180,13 +183,13 @@ filtered_combined_commongenes=filter_counts(combined_commongenes)   # 15458 gene
 
 filtered_combined_commongenes <- calcNormFactors(filtered_combined_commongenes)    # Calculate normalization factors. TMM by default
 # save as an object for later analyses
-save(filtered_combined_commongenes, file = "/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_old_and_new_filtered_75bp.xz" , compress="xz")
+#save(filtered_combined_commongenes, file = "/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_old_and_new_filtered_75bp.xz" , compress="xz")
 
 v <- voom(filtered_combined_commongenes,design,plot=F) # voom normalize the read counts
 
 
 
-sdc_voom=plot_sdc(v$E) 
+# sdc_voom=plot_sdc(v$E) 
 
 p=plot_pca(v$E)
 p
