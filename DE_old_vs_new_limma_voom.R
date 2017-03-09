@@ -4,7 +4,7 @@ currentDate <- Sys.Date() # to save date in name of output files
 
 library(limma)
 
-load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_old_and_new_filtered.xz",verbose=TRUE)  #loading the dge object for conservative counts
+load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_old_and_new_filtered_75bp.xz",verbose=TRUE)  #loading the dge object for conservative counts
 
 donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
