@@ -166,7 +166,7 @@ plot_sdc=function(x){
   return(sdc)
 }
 
-plot_pca=function(x,s=samples,st=stages){
+plot_pca=function(x,s=Samples,st=Stages){
   pca1<-prcomp(t(x), retx=TRUE)
   
   plot(pca1, type = "l") #variance vs first 10 components
@@ -175,25 +175,27 @@ plot_pca=function(x,s=samples,st=stages){
   percentVar <- (pca1$sdev)^2 / sum(pca1$sdev^2)
   percentVar <- round(100 * percentVar)
   pcs <- as.data.frame(pca1$x)
-  pcs <- cbind(pcs,sample=samples,stage=stages)
-  pcs$stage <- ordered(pcs$stage, levels = stage)
+  pcs <- cbind(pcs,Samples=Samples,Stages=Stages)
+  pcs$Stages <- ordered(pcs$Stages, levels = Stages)
   
   diaPalette <- c("#CADAE8", "#7883BA", "#755A91", "#CC85B1", "#C15858", "#F4B8B0", "#96665A", "#6DA567")  # Diabetologia palette
   
-  p <- ggplot(pcs, aes(PC1, PC2, colour=stage, shape=samples)) + 
-    geom_point(size = 3) + xlab (paste0( "PC1:" ,percentVar[ 1 ],"% variance")) + 
+  p <- ggplot(pcs, aes(PC1, PC2, colour=Stages, shape=Samples)) + 
+    geom_point(size = 4) + xlab (paste0( "PC1: " ,percentVar[ 1 ],"% variance")) + 
     ylab (paste0( "PC2: ",percentVar[ 2 ],"% variance" )) +
     scale_colour_manual(values=diaPalette)
   p <- p + theme(	panel.grid.major = element_blank(), panel.grid.minor = element_blank(), 
                   panel.background = element_blank(),
                   panel.border = element_rect(fill = NA, colour = "black"), 
                   legend.key = element_blank(),# legend.position = c(0.5,0.5),
-                  axis.title.y = element_text(face="bold", angle=90, size=12, vjust=0.2),
-                  axis.title.x = element_text(face="bold", size=12, vjust=0),
-                  axis.text.x = element_text(face="bold", colour = "black", angle=90, size=12, vjust=0.2, hjust =1 ),
-                  axis.text.y = element_text(face="bold", colour = "black"),
+                  axis.title.y = element_text(face="bold", angle=90, size=16, vjust=0.2),
+                  axis.title.x = element_text(face="bold", size=16, vjust=0),
+                  axis.text.x = element_text(face="bold", colour = "black", angle=90, size=16, vjust=0.2, hjust =1 ),
+                  axis.text.y = element_text(face="bold", colour = "black",size=16),
                   axis.ticks = element_line(colour = "black"),
-                  axis.line = element_line(colour = "black"))
+                  axis.line = element_line(colour = "black"),
+                  legend.text = element_text(size=14,face="bold",family = "Helvetica"),
+                  legend.title = element_text(size=16,face="bold",family = "Helvetica"))
   
   return(p)
 }
@@ -242,6 +244,10 @@ load(file="/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_c
 
 donors= c("Ad2.1","Ad3.1","Neo1.1")  # data comes from three donors
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","ENstage6", "ENstage7") # 8 stages
+
+#Renaming stages and samples for plotting
+Stages= c("iPSC", "DE", "GT", "PF", "PE", "EP","EN", "BLC") 
+Samples= c("Sample 1","Sample 2","Sample 3")
 
 # order by samples, to make the design matrix clearer:
 dge_cc$counts=order_by_samples(dge_cc$counts)
@@ -358,7 +364,8 @@ stages <-rep(stage,3)
 p=plot_pca(v2$E)
 p
 
-ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/DEA/",currentDate,"_PCA_conservative_counts_newsamples_diabetologia.jpg",sep=""),p,width=10,height=8,units="in",dpi=300)
+ggsave(paste("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/DEA/",currentDate,"_PCA_conservative_counts_newsamples_diabetologia.jpg",sep=""),
+       p,width=10,height=8,units="in",dpi=600)
 
 ```
 
