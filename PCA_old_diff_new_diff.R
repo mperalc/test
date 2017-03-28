@@ -93,21 +93,24 @@ plot_pca=function(x,s=samples,st=stages){
   percentVar <- (pca1$sdev)^2 / sum(pca1$sdev^2)
   percentVar <- round(100 * percentVar)
   pcs <- as.data.frame(pca1$x)
-  pcs <- cbind(pcs,sample=samples,stage=stages,experiment=c(rep("new",24),rep("old",12)))
-  levels(pcs$stage) <- c(levels(pcs$stage), c("EN","BLC"))  # change name of stages, first increase levels of factor
-  pcs[which(pcs$stage=="ENstage6"),"stage"] <- "EN" 
-  pcs[which(pcs$stage=="ENstage7"),"stage"] <- "BLC"
+  pcs <- cbind(pcs,Samples=samples,Stages=stages,Experiment=c(rep("New",24),rep("Old",12)))
+  levels(pcs$Stages) <- c(levels(pcs$Stages), c("EN","BLC","GT","PF"))  # change name of stages, first increase levels of factor
+  pcs[which(pcs$Stages=="ENstage6"),"Stages"] <- "EN" 
+  pcs[which(pcs$Stages=="ENstage7"),"Stages"] <- "BLC"
+  pcs[which(pcs$Stages=="PGT"),"Stages"] <- "GT"
+  pcs[which(pcs$Stages=="PFG"),"Stages"] <- "PF"
+  
   pcs <- droplevels(pcs)  # drop unused levels (old names)
   
-  pcs$stage <- ordered(pcs$stage, levels = c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN", "BLC") ) # order levels, for colours
+  pcs$Stages <- ordered(pcs$Stages, levels = c("iPSC", "DE", "GT", "PF", "PE", "EP","EN", "BLC") ) # order levels, for colours
   
   diaPalette <- c("#CADAE8", "#7883BA", "#755A91", "#CC85B1", "#C15858", "#F4B8B0", "#96665A", "#6DA567")  # Diabetologia palette
   
-  p <- ggplot(pcs,aes(x=PC1,y=PC2, color=stage, shape=sample)) +
-    geom_point(size=3, aes(fill=stage, alpha=as.character(experiment)),stroke=1) +
+  p <- ggplot(pcs,aes(x=PC1,y=PC2, color=Stages, shape=Samples)) +
+    geom_point(size=4, aes(fill=Stages, alpha=as.character(Experiment)),stroke=1) +
     geom_point(size=2.5,stroke=1.5) +      
     scale_shape_manual(values=c(22,24,25,21)) +
-    scale_alpha_manual(values=c("old"=0, "new"=diaPalette),name="experiment",guide="none") + # guide="none" takes out legend for this alpha
+    scale_alpha_manual(values=c("Old"=0, "New"=diaPalette),name="Experiment",guide="none") + # guide="none" takes out legend for this alpha
     scale_colour_manual(values=diaPalette) +
     scale_fill_manual(values=diaPalette) +
     xlab (paste0( "PC1:" ,percentVar[ 1 ],"% variance")) + 
@@ -118,12 +121,14 @@ plot_pca=function(x,s=samples,st=stages){
                     panel.background = element_blank(),
                     panel.border = element_rect(fill = NA, colour = "black"), 
                     legend.key = element_blank(),# legend.position = c(0.5,0.5),
-                    axis.title.y = element_text(face="bold", angle=90, size=12, vjust=0.2),
-                    axis.title.x = element_text(face="bold", size=12, vjust=0),
-                    axis.text.x = element_text(face="bold", colour = "black", angle=90, size=12, vjust=0.2, hjust =1 ),
-                    axis.text.y = element_text(face="bold", colour = "black"),
+                    axis.title.y = element_text(face="bold", angle=90, size=16, vjust=0.2),
+                    axis.title.x = element_text(face="bold", size=16, vjust=0),
+                    axis.text.x = element_text(face="bold", colour = "black", angle=90, size=16, vjust=0.2, hjust =1 ),
+                    axis.text.y = element_text(face="bold", colour = "black",size=16),
                     axis.ticks = element_line(colour = "black"),
-                    axis.line = element_line(colour = "black"))
+                    axis.line = element_line(colour = "black"),
+                    legend.text = element_text(face="bold", colour = "black",size=14),
+                    legend.title = element_text(face="bold", colour = "black",size=16))
   
   plot(p)
   # ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/conservative_counts/Diff_v2_PCA.tiff",p,compression="lzw")
@@ -193,7 +198,7 @@ v <- voom(filtered_combined_commongenes,design,plot=F) # voom normalize the read
 
 p=plot_pca(v$E)
 p
-ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_75bp_commongenes_PC1and2.jpg",p,width=10,height=8,units="in",dpi=300)
+ggsave("/Users/Marta/Documents/WTCHG/DPhil/Plots/Diff_v2/new_diff_vs_old_75bp_commongenes_PC1and2_diabetologia.jpg",p,width=10,height=8,units="in",dpi=300)
 
 # other PCs
 
