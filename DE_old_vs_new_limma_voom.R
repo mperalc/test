@@ -91,8 +91,8 @@ for(s in old_stages){
   diff_exp3=topTable(fit3,coef=ncol(design3),sort.by = "none",number=nrow(fit3$coefficients))  
   diff_exp_allstages_nominal[[s]]=diff_exp3[which(diff_exp3$P.Value<0.01 & (diff_exp3$logFC>1 | diff_exp3$logFC<(-1))),]
   diff_exp_allstages[[s]]=diff_exp3[which(diff_exp3$adj.P.Val<0.01 & (diff_exp3$logFC>1 | diff_exp3$logFC<(-1))),]  #pval<0.01 and logFC>1
-  # write.csv(diff_exp_allstages[[s]],file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/comparison_old_and_new_study/",currentDate,"_diff_exp_old_vs_new_protocol_",s,"_stage_1percent_adjpval_1cpm.csv",sep=""),
-  #          row.names = F)
+   write.csv(diff_exp_allstages[[s]],file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/comparison_old_and_new_study/old_with_75bp_reads/",currentDate,"_diff_exp_old_vs_new_protocol_",s,"_stage_1percent_adjpval_1cpm_old_75bp_reads.csv",sep=""),
+            row.names = F)
   
 }
 
