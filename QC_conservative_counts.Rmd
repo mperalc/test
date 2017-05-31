@@ -106,14 +106,76 @@ Now I will keep in my count object just the genes that still exist in ENSEMBL.
 ```{r ENSEMBL trimming, echo=FALSE}
 
 #conservative counts
-ensembl <- useMart("ENSEMBL_MART_ENSEMBL",dataset="hsapiens_gene_ensembl",host="www.ensembl.org")
+ensembl38 <- useMart("ENSEMBL_MART_ENSEMBL",dataset="hsapiens_gene_ensembl",host="www.ensembl.org")
 
-all_ensembl_info_cc <- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
-                          filters = 'ensembl_gene_id', values = rownames(counts_cc), mart = ensembl)
-rownames(all_ensembl_info_cc) <- all_ensembl_info_cc$ensembl_gene_id
+all_ensembl_info_ensemblFound<- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
+                          filters = 'ensembl_gene_id', values = rownames(counts_cc), mart = ensembl38)
+rownames(all_ensembl_info_ensemblFound) <- all_ensembl_info_ensemblFound$ensembl_gene_id
 
-counts_cc <- counts_cc[all_ensembl_info_cc$ensembl_gene_id,] #keep genes in counts whose Ensembl geneID still exists in current genome build. 52699 remaining
 
+diff=setdiff(rownames(counts_cc),rownames(all_ensembl_info_ensemblFound)) # IDs lost (not found in GRCh38) , 5188 genes
+
+ensembl37 = useMart(biomart="ENSEMBL_MART_ENSEMBL", host="grch37.ensembl.org", path="/biomart/martservice" ,dataset="hsapiens_gene_ensembl") 
+
+all_ensembl_info_ensemblNotFound<- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
+                          filters = 'ensembl_gene_id', values = diff, mart = ensembl37)   # all info in GRCh37 of genes not found in GRCh38
+
+# check by gene names if they exist in grch38
+
+
+all_ensembl_info_ensemblNotFoundGRCh38<- getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
+                          filters = 'external_gene_name', values = all_ensembl_info_ensemblNotFound$external_gene_name, mart = ensembl38) 
+# there are duplicated ids. Check which ones are correct calling grch38 with ids
+
+all_ensembl_info_ensemblNotFoundGRCh38Ids=getBM(attributes=c('ensembl_gene_id', 'external_gene_name', 'gene_biotype', 'chromosome_name'),
+                          filters = 'ensembl_gene_id', values = all_ensembl_info_ensemblNotFoundGRCh38$ensembl_gene_id, mart =ensembl38) 
+# remove those not in autosomes, as we have duplicate ids from weird chromosome assemblies
+
+chr <- c(1:22)
+all_ensembl_info_ensemblNotFoundGRCh38Ids <- all_ensembl_info_ensemblNotFoundGRCh38Ids[which(all_ensembl_info_ensemblNotFoundGRCh38Ids$chromosome_name %in% chr),]
+
+
+keep1=all_ensembl_info_ensemblFound #keep genes in counts whose Ensembl geneID still exists in current genome build. 
+
+# take genes not found in GRCh38 by id, that still exist in GRCh38 with different id
+# genes that change id, to then save old and new id
+toChangeGeneNames=intersect(all_ensembl_info_ensemblNotFoundGRCh38Ids$external_gene_name, all_ensembl_info_ensemblNotFound$external_gene_name)
+
+old=all_ensembl_info_ensemblNotFound[which(  all_ensembl_info_ensemblNotFound$external_gene_name %in% toChangeGeneNames),c(1:2)]
+colnames(old)=c("old_id","external_gene_name")
+anyDuplicated(old)  # but there are duplicates! (weird genes with lots of gene ids)
+old=old[which(!duplicated(old$external_gene_name)),]
+
+new=all_ensembl_info_ensemblNotFoundGRCh38Ids[which(all_ensembl_info_ensemblNotFoundGRCh38Ids$external_gene_name %in% toChangeGeneNames),]
+new=new[which(!duplicated(new$external_gene_name)),]
+
+
+keep2=merge(old,new,by="external_gene_name") # merge old and new info
+rownames(keep2)=keep2$old_id
+
+# modify IDs in counts of those that change id
+# toModify = which(rownames(counts_cc) %in%  keep2$old_id)  # select rows to change in counts
+# keep2=keep2[rownames(counts_cc[toModify,]),]# same order as toModify
+#rownames(counts_cc)[toModify] <- keep2[,"ensembl_gene_id"]  # several gene ids are duplicated, for some reason
+# change just HNF1B
+keep2=keep2[which(keep2$external_gene_name=="HNF1B"),]
+rownames(counts_cc)[which(rownames(counts_cc)==keep2$old_id)] <- keep2$ensembl_gene_id # cange old id for new id
+rownames(keep2)=keep2$ensembl_gene_id  # change rowname to new id
+
+keep3=rbind(keep1,keep2[c(1,3:5)])  # join
+
+dup=keep3[which(duplicated.data.frame(keep3)),] 
+# x duplicated elements. Remove them
+
+keep3=keep3[which(!duplicated.data.frame(keep3)),] # 52633
+
+
+# merge info from found and not found that still exist with different iD in GRCh38
+counts_cc=counts_cc[rownames(keep3),]  # 52633 genes remain
+
+all_ensembl_info_cc = keep3
+
+rm(keep1,keep2,keep3,all_ensembl_info_ensemblFound,all_ensembl_info_ensemblNotFound,all_ensembl_info_ensemblNotFoundGRCh38,all_ensembl_info_ensemblNotFoundGRCh38Ids)
 ```
 
 After trimming,  conservative counts has `r nrow(counts_cc)` genes.
@@ -124,17 +186,24 @@ Now I want to keep in my count object genes with at least 1 cpm in at least one 
 ```{r cpm trimming, echo=FALSE}
 
 
-# create DGE object
-
 group <- rep(stage,each=3)    #group by stages 
 
+anyNA(counts_cc)  # remove NAs:
+
+counts_cc=na.omit(counts_cc)
+
+# remove from gene info genes not in counts
 
 
+all_ensembl_info_cc = all_ensembl_info_cc[rownames(counts_cc),]  # 52632 genes remain
+
+# create DGE object
 dge_cc <- DGEList(counts=counts_cc,group=group,genes=all_ensembl_info_cc) 
-all_ensembl_info_cc=all_ensembl_info_cc[rownames(dge_cc$counts),] 
+all_ensembl_info_cc=all_ensembl_info_cc[rownames(dge_cc$counts),] # re-sort
 
+# filter simply (remove genes with less that 3 columns with cpm<=1)
 keep_cc <- rowSums(cpm(dge_cc)>1) >= 3   
-dge_cc <- dge_cc[keep_cc, , keep.lib.sizes=FALSE]     
+dge_cc <- dge_cc[keep_cc, , keep.lib.sizes=FALSE]  # 17779 genes remain   
 
 ```
 After trimming,  conservative counts has `r nrow(dge_cc)` genes.
@@ -155,7 +224,7 @@ ditch=dge_cc$counts[c,] # table to throw away
 
 keep=!(rownames(dge_cc$counts) %in% rownames(ditch))
 
-dge_cc <- dge_cc[keep, , keep.lib.sizes=FALSE] # counts now has 17790 genes
+dge_cc <- dge_cc[keep, , keep.lib.sizes=FALSE] # counts now has 17776 genes
     
 rm(c,keep,ditch)
 
@@ -170,7 +239,7 @@ before=nrow(dge_cc)
 dge_cc <- dge_cc[which(dge_cc$genes$gene_biotype == "protein_coding" | dge_cc$genes$gene_biotype == "lincRNA"),]
 
 
-# now has 15811 genes
+# now has 15810 genes
 
 gene_lost_step_1_cc=before-nrow(dge_cc)
 before=nrow(dge_cc)
@@ -179,7 +248,7 @@ before=nrow(dge_cc)
 chr <- c(1:22)
 dge_cc <- dge_cc[which(dge_cc$genes$chromosome_name %in% chr),]
 
-# now has 15220 genes
+# now has 15221 genes
 
 
 ```
