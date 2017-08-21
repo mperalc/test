@@ -1,5 +1,8 @@
 ## Hypergeometric test for datasets: are they enriched in T2D/FG genes?
 
+# in paper 2017
+# for each gene Diff expr in each stage
+# for each gene diff expr in the first 7 stages (below)
 # Takes in:
   # A list of SNPs in LD with credible sets for DIAGRAM (T2D)
       # I then need to take the SNPs coordinates of the extremes of each regions, and take out all genes inside (ENSEMBL)
@@ -17,7 +20,9 @@ currentDate <- Sys.Date() # to save date in name of output files
 
 stage= c("iPSC", "DE", "PGT", "PFG", "PE", "EP","EN6", "EN7")
 
-trait= "FG"    # T2D or fasting glucose (FG)?
+trait= "T2D"    # T2D or fasting glucose (FG)?
+type="all"     #or top623
+order="p-value"   # or logFC
 ### files
 
 #### background "genome" data
@@ -33,11 +38,20 @@ test <- list()
                   
 
 for(d in distance){
-  test[[d]]=read.table(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
-                                  trait,
-                                   #"/2017-02-22annotated_genes_in_credible_regions_plusminus_",
-                                  "/2017-05-03FG_annotated_genes_in_credible_regions_plusminus_",
-                                  d,"_kb.txt",sep=""),header=T)
+  if (trait=="FG"){
+    test[[d]]=read.table(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+                                    trait,
+                                    #"/2017-02-22annotated_genes_in_credible_regions_plusminus_",
+                                    "/2017-05-03FG_annotated_genes_in_credible_regions_plusminus_",
+                                    d,"_kb.txt",sep=""),header=T)
+  }
+  else{
+    test[[d]]=read.table(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+                                    trait,
+                                    "/2017-02-22annotated_genes_in_credible_regions_plusminus_",
+                                    d,"_kb.txt",sep=""),header=T)
+  
+  }
   colnames(test[[d]])[1]=c("GeneID")
   test[[d]]$GeneID=as.character(test[[d]]$GeneID)
 }
@@ -49,17 +63,22 @@ for(d in distance){
 
 sig_stages=list()
 for(s in stage){
- 
-  sig_stages[[s]] <- read.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/across-stages/2017-07-03_sig_",s,"_diff_expression_maxvals_across-stages_results_logFC1.csv",sep=""),header = T) # read in DEA data for each stage
-  colnames(sig_stages[[s]])[1]="GeneID"
-  #sig_stages[[s]]=sig_stages[[s]][ order(sig_stages[[s]]$adj.P.Val,decreasing=F),] # order by adjusted p.value 
-  sig_stages[[s]]=sig_stages[[s]][ order(sig_stages[[s]]$logFC,decreasing=T),] # order by logFC 
-  
-  # top 500 genes
-  #sig_stages[[s]]=sig_stages[[s]][c(1:500),]
-  
-  # top 623 genes (min significant DE genes, in PGT stage)
-  sig_stages[[s]]=sig_stages[[s]][c(1:623),]
+ if(order=="p-value"){
+   sig_stages[[s]] <- read.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/across-stages/2017-07-03_sig_",s,"_diff_expression_maxvals_across-stages_results_logFC1.csv",sep=""),header = T) # read in DEA data for each stage
+   colnames(sig_stages[[s]])[1]="GeneID"
+   sig_stages[[s]]=sig_stages[[s]][ order(sig_stages[[s]]$adj.P.Val,decreasing=F),] # order by adjusted p.value 
+ }
+  else{
+    sig_stages[[s]] <- read.csv(file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/Results/Diff_v2/Voom/across-stages/2017-07-03_sig_",s,"_diff_expression_maxvals_across-stages_results_logFC1.csv",sep=""),header = T) # read in DEA data for each stage
+    colnames(sig_stages[[s]])[1]="GeneID"
+    sig_stages[[s]]=sig_stages[[s]][ order(sig_stages[[s]]$logFC,decreasing=T),] # order by logFC 
+  }
+  if(type=="top623"){
+    
+    # top 623 genes (min significant DE genes, in PGT stage)
+    sig_stages[[s]]=sig_stages[[s]][c(1:623),]
+  }
+
   }
 
 ##################
@@ -84,9 +103,6 @@ for(s in stage){
 
 # comparison of probabilities
 
-df_list <- list()
-distance = c("0","50","100","200","500") # list of distances in kb
-
 phyperRandom <- function(myGeneList, myGeneSet, genome){
   myRandomGS <- sample( genome,size=length(myGeneSet) )  # take random sample of genes from whole genome, same size as set tested
   myX <- length(which(myGeneList %in% myRandomGS))  # number of T2D in random set
@@ -97,6 +113,8 @@ phyperRandom <- function(myGeneList, myGeneSet, genome){
                   m=myM, n=myN, k=myK), n.overlap=myX))
 }
 
+df_list <- list()
+distance = c("0","50","100","200","500") # list of distances in kb
 overlap_list <- list()  # to write down number of T2D genes in diff expr results
 
 for(d in distance){
@@ -426,39 +444,45 @@ T2D=read.table(file="/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_cr
 T2D$pval=-log10(T2D$pval)
 T2D$conf.int.low=-log10(T2D$conf.int.low)
 T2D$conf.int.up=-log10(T2D$conf.int.up)
-T2D$distance=as.character((T2D$distance))
+T2D$distance=as.factor(T2D$distance)
+T2D$distance=ordered(T2D$distance, levels = c("0", "50", "100", "200", "500") ) # order levels
+colnames(T2D)=c("distance","pval","conf.int.low","conf.int.up","Differentially expressed genes")
+levels(T2D$`Differentially expressed genes`) <- c(levels(T2D$`Differentially expressed genes`), c("All","Beta cell function","Top 623"))  #  first increase levels of factor
 
+T2D[which(T2D$`Differentially expressed genes`=="all"),"Differentially expressed genes"] <- "All"
+T2D[which(T2D$`Differentially expressed genes`=="phys"),"Differentially expressed genes"] <- "Beta cell function"
+T2D[which(T2D$`Differentially expressed genes`=="top_623"),"Differentially expressed genes"] <- "Top 623"
 diaPalette <- c( "#7883BA",  "#C15858",  "#6DA567")  # Diabetologia palette
 
 
-ggplot(T2D, aes(x=distance, y=pval, colour=type)) +
-  geom_crossbar(aes(ymin=conf.int.low, ymax=conf.int.up), width=0.2,fatten = 4) +
-  #geom_line(position=pd,size=1.5) +
-  scale_colour_manual(values=diaPalette) +
-  #geom_point(position=pd, size=4, shape=21, fill="white") +
-  xlab("Distance (kB)") +
-  ylab("Permuted p-value (-log10)") +
-  theme_bw() +
-  geom_hline(yintercept=-log10(0.05),linetype="dashed",size=0.8,col="red") +
-  theme(   panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-           panel.background = element_blank(),
-           panel.border = element_rect(fill = NA, colour = "black"),
-           legend.key = element_blank(), # legend.position = c(0.5,0.5),
-           axis.title.y = element_text(face="bold", angle=90, size=16, vjust=0.2),
-           axis.title.x = element_text(face="bold", size=16, vjust=0),
-           axis.text.x = element_text(face="bold", colour = "black", angle=90, size=16, vjust=0.2, hjust =1 ),
-           axis.text.y = element_text(face="bold", colour = "black",size=16),
-           axis.ticks = element_line(colour = "black"),
-           axis.line = element_line(colour = "black"),
-           legend.text = element_text(face="bold", colour = "black",size=14),
-           legend.title = element_text(face="bold", colour = "black",size=16))
+# ggplot(T2D, aes(x=distance, y=pval, colour=`Differentially expressed genes`)) +
+#   geom_crossbar(aes(ymin=conf.int.low, ymax=conf.int.up), width=0.2,fatten = 4) +
+#   #geom_line(position=pd,size=1.5) +
+#   scale_colour_manual(values=diaPalette) +
+#   #geom_point(position=pd, size=4, shape=21, fill="white") +
+#   xlab("Distance (kB)") +
+#   ylab("Permuted p-value (-log10)") +
+#   theme_bw() +
+#   geom_hline(yintercept=-log10(0.05),linetype="dashed",size=0.8,col="red") +
+#   theme(   panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+#            panel.background = element_blank(),
+#            panel.border = element_rect(fill = NA, colour = "black"),
+#            legend.key = element_blank(), # legend.position = c(0.5,0.5),
+#            axis.title.y = element_text(face="bold", angle=90, size=16, vjust=0.2),
+#            axis.title.x = element_text(face="bold", size=16, vjust=0),
+#            axis.text.x = element_text(face="bold", colour = "black", angle=90, size=16, vjust=0.2, hjust =1 ),
+#            axis.text.y = element_text(face="bold", colour = "black",size=16),
+#            axis.ticks = element_line(colour = "black"),
+#            axis.line = element_line(colour = "black"),
+#            legend.text = element_text(face="bold", colour = "black",size=14),
+#            legend.title = element_text(face="bold", colour = "black",size=16))
+# 
+# ggsave(file="/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_T2D/just_BLC_T2D_geom_crossbar.jpg",
+#        width=10,height=8,units="in",dpi=300)
 
-ggsave(file="/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_T2D/just_BLC_T2D_geom_crossbar.jpg",
-       width=10,height=8,units="in",dpi=300)
-
-ggplot(T2D, aes(x=distance, y=pval, colour=type,group=type)) +
+ggplot(T2D, aes(x=distance, y=pval, colour=`Differentially expressed genes`,group=`Differentially expressed genes`)) +
   geom_errorbar(aes(ymin=conf.int.low, ymax=conf.int.up), width=0.1,size=1) +
-  geom_line(aes(linetype = type),size=0.5)+
+  geom_line(aes(linetype = `Differentially expressed genes`),size=0.5)+
   scale_colour_manual(values=diaPalette) +
   geom_point(size = 4) +
   geom_point(size = 3, color = "white") + 
@@ -480,4 +504,178 @@ ggplot(T2D, aes(x=distance, y=pval, colour=type,group=type)) +
            legend.title = element_text(face="bold", colour = "black",size=16))
 
 ggsave(file="/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_T2D/just_BLC_T2D_geom_point_line.jpg",
+       width=12,height=8,units="in",dpi=300)
+
+FG=read.table(file="/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_FG/all_diff_expr_genes/FG_all_diffexpr_genes_just_BLC_EP.txt",
+               header=T)
+
+FG$pval=-log10(FG$pval)
+FG$conf.int.low=-log10(FG$conf.int.low)
+FG$conf.int.up=-log10(FG$conf.int.up)
+FG$distance=as.factor(FG$distance)
+FG$distance=ordered(FG$distance, levels = c("0", "50", "100", "200", "500") ) # order levels
+colnames(FG)=c("Stage","pval","conf.int.low","conf.int.up","distance")
+
+diaPalette <- c( "#C15858",  "#7883BA")  # Diabetologia palette
+
+ggplot(FG, aes(x=distance, y=pval, colour=Stage,group=Stage)) +
+  geom_errorbar(aes(ymin=conf.int.low, ymax=conf.int.up), width=0.1,size=1) +
+  geom_line(aes(linetype = Stage),size=0.5)+
+  scale_colour_manual(values=diaPalette) +
+  geom_point(size = 4) +
+  geom_point(size = 3, color = "white") + 
+  xlab("Distance (kB)") +
+  ylab("Permuted p-value (-log10)") +
+  theme_bw() +
+  geom_hline(yintercept=-log10(0.05),linetype="dashed",size=0.8,col="red") +
+  theme(   panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+           panel.background = element_blank(),
+           panel.border = element_rect(fill = NA, colour = "black"),
+           legend.key = element_blank(), # legend.position = c(0.5,0.5),
+           axis.title.y = element_text(face="bold", angle=90, size=16, vjust=0.2),
+           axis.title.x = element_text(face="bold", size=16, vjust=0),
+           axis.text.x = element_text(face="bold", colour = "black", angle=90, size=16, vjust=0.2, hjust =1 ),
+           axis.text.y = element_text(face="bold", colour = "black",size=16),
+           axis.ticks = element_line(colour = "black"),
+           axis.line = element_line(colour = "black"),
+           legend.text = element_text(face="bold", colour = "black",size=14),
+           legend.title = element_text(face="bold", colour = "black",size=16))
+
+ggsave(file="/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_FG/all_diff_expr_genes/FG_all_diffexpr_genes_just_BLC_EP.jpg",
        width=10,height=8,units="in",dpi=300)
+
+
+
+### test for enrichment in T2D genes for each diff expr gene of the first 7 stages (all developmental)
+# less strict than for each stage, as above considers mature the last stage (BLC), and the developmental
+# signals are spread across 7 other stages.
+
+
+df_list <- list()
+distance = c("0","50","100","200","500") # list of distances in kb
+overlap_list <- list()  # to write down number of T2D genes in diff expr results
+
+for(d in distance){
+  
+  prob_results=list()
+  sums_probs=list()
+  b_test <- list()
+  overlap <- list()
+  
+  for(z in stage){
+    
+    # p-value for enrichment in T2D genes using my differentially expressed genes for each stage
+    prob_results[[z]]=1-phyper(q=length(which(test[[d]]$GeneID %in% sig_stages[[z]]$GeneID))-1,
+                               m=length(which(test[[d]]$GeneID %in% dge_cc$genes$ensembl_gene_id)),
+                               n=length(dge_cc$genes$ensembl_gene_id) - length(which(test[[d]]$GeneID %in% dge_cc$genes$ensembl_gene_id)),
+                               k=length(sig_stages[[z]]$GeneID))
+    gene_list=test[[d]][which(test[[d]]$GeneID %in% sig_stages[[z]]$GeneID),]
+    # # write.table(gene_list,
+    #             file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+    #                   trait,
+    #                   "/",
+    #                   currentDate,
+    #                   "_gene_list_",
+    #                   trait,
+    #                   "_in_top500_genes_stage_",
+    #                   z,"_",d,
+    #                   "_kb_around_credible_regions.txt",sep=""),
+    #             sep="\t",col.names = T,row.names = F,quote = F)
+    # getting amount of T2D genes in each stage and in background pool
+    overlap[["total_in_background"]] = length(which(test[[d]]$GeneID %in% dge_cc$genes$ensembl_gene_id))
+    
+    overlap[[z]] = length(which(test[[d]]$GeneID %in% sig_stages[[z]]$GeneID))
+    
+    # same, for random set of genes of same size. random gene set distribution of p-values
+    random=list()
+    random_overlaps=numeric()
+    probab_random=numeric()
+    
+    for(i in 1:10000){
+      random[[i]] <- as.data.frame(phyperRandom( test[[d]]$GeneID, sig_stages[[z]]$GeneID, dge_cc$genes$ensembl_gene_id))  # get probs from random gene sets, for each diff expr set tested
+      probab_random[i] <- random[[i]]$prob
+      random_overlaps[i] <- random[[i]]$n.overlap
+      
+    }
+    
+    
+    # png(paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+    #                trait,
+    #                "/",
+    #                currentDate,
+    #                "_random_overlaps_",
+    #                trait,
+    #                "_top500_genes_stage_",
+    #                z,"_",d,
+    #                "_kb_around_credible_regions.png",sep=""),
+    #     type="cairo",
+    #     width=8,height=5,units="in",res=300,pointsize = 12)
+    hist(random_overlaps)
+    # dev.off()
+    #hist(probab_random)
+    
+    # empirical p-value 
+    
+    sums_probs[[z]]$pval=((sum(probab_random<=prob_results[[z]])+1)/(10000+1)) # fraction of probabilities from random draws that are more extreme (smaller) than the one from my tested set
+    # +1 in case sum(probab_random<=prob_results[[z]]) ==0
+    # that would be the permuted? p-value
+    
+    # calculate the 95% confidence interval from the binomial distribution
+    b_test[[z]]=binom.test(sum(probab_random<=prob_results[[z]]),10000)  # If those fractions are my "successes", then the binomial test can give me a confidence interval
+    sums_probs[[z]]$conf.int.low=b_test[[z]]$conf.int[1]
+    sums_probs[[z]]$conf.int.up=b_test[[z]]$conf.int[2]
+    
+    
+    print(z)
+    
+  }
+  overlap_list[[d]] <- do.call("rbind", overlap)
+  
+  df_list[[d]] <- do.call("rbind", sums_probs)
+  
+  # ######### save tables
+  # ordered by p-value
+  
+  # 
+  # write.table(df_list[[d]],quote=F,row.names=T,col.names = T,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+  #                                                                       trait,
+  #                                                                       "/",
+  #                                                                       currentDate,
+  #                                                                       "_top623_DEA_timecourse_pvals_hyperg_",
+  #                                                                       trait,
+  #                                                                       "_genes_enrichment_10k_permutations_",
+  #                                                                       d,
+  #                                                                       "_kb_from_credible_regions.txt",sep=""),sep="\t")
+  # write.table(overlap_list[[d]],quote=F,row.names=T,col.names = F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+  #                                                                       trait,
+  #                                                                       "/",
+  #                                                                       currentDate,
+  #                                                                       "_top623_DEA_timecourse_overlaps_hyperg_",
+  #                                                                       trait,
+  #                                                                       "_genes_enrichment_",
+  #                                                                       d,
+  #                                                                       "_kb_from_credible_regions.txt",sep=""),sep="\t")
+  
+  # ordered by logFC
+  
+  write.table(df_list[[d]],quote=F,row.names=T,col.names = T,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+                                                                        trait,
+                                                                        "/",
+                                                                        currentDate,
+                                                                        "_top623_orderedByLogFC_DEA_timecourse_pvals_hyperg_",
+                                                                        trait,
+                                                                        "_genes_enrichment_10k_permutations_",
+                                                                        d,
+                                                                        "_kb_from_credible_regions.txt",sep=""),sep="\t")
+  write.table(overlap_list[[d]],quote=F,row.names=T,col.names = F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+                                                                             trait,
+                                                                             "/",
+                                                                             currentDate,
+                                                                             "_top623_orderedByLogFC_DEA_timecourse_overlaps_hyperg_",
+                                                                             trait,
+                                                                             "_genes_enrichment_",
+                                                                             d,
+                                                                             "_kb_from_credible_regions.txt",sep=""),sep="\t")
+}
+
+
