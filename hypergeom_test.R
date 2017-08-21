@@ -555,6 +555,13 @@ df_list <- list()
 distance = c("0","50","100","200","500") # list of distances in kb
 overlap_list <- list()  # to write down number of T2D genes in diff expr results
 
+# merge developmental stages in one big stage
+
+dev=do.call("rbind", sig_stages[c(1:7)])  # dev has 7612 genes
+adult=sig_stages$EN7 # adult has 1796 genes
+stage=c("dev","adult")
+sig_stages$dev=dev   # adding elements to list
+sig_stages$adult=adult
 for(d in distance){
   
   prob_results=list()
@@ -570,18 +577,21 @@ for(d in distance){
                                n=length(dge_cc$genes$ensembl_gene_id) - length(which(test[[d]]$GeneID %in% dge_cc$genes$ensembl_gene_id)),
                                k=length(sig_stages[[z]]$GeneID))
     gene_list=test[[d]][which(test[[d]]$GeneID %in% sig_stages[[z]]$GeneID),]
-    # # write.table(gene_list,
-    #             file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
-    #                   trait,
-    #                   "/",
-    #                   currentDate,
-    #                   "_gene_list_",
-    #                   trait,
-    #                   "_in_top500_genes_stage_",
-    #                   z,"_",d,
-    #                   "_kb_around_credible_regions.txt",sep=""),
-    #             sep="\t",col.names = T,row.names = F,quote = F)
-    # getting amount of T2D genes in each stage and in background pool
+    # getting amount of T2D genes in each stage 
+    write.table(gene_list,
+                file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+                      trait,
+                      "/",
+                      currentDate,
+                      "_gene_list_",
+                      trait,
+                      "_in_",
+                      type,
+                      "genes_stage_",
+                      z,"_",d,
+                      "_kb_around_credible_regions.txt",sep=""),
+                sep="\t",col.names = T,row.names = F,quote = F)
+    #  and in background pool
     overlap[["total_in_background"]] = length(which(test[[d]]$GeneID %in% dge_cc$genes$ensembl_gene_id))
     
     overlap[[z]] = length(which(test[[d]]$GeneID %in% sig_stages[[z]]$GeneID))
@@ -599,20 +609,8 @@ for(d in distance){
     }
     
     
-    # png(paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
-    #                trait,
-    #                "/",
-    #                currentDate,
-    #                "_random_overlaps_",
-    #                trait,
-    #                "_top500_genes_stage_",
-    #                z,"_",d,
-    #                "_kb_around_credible_regions.png",sep=""),
-    #     type="cairo",
-    #     width=8,height=5,units="in",res=300,pointsize = 12)
-    hist(random_overlaps)
-    # dev.off()
-    #hist(probab_random)
+    
+    h=hist(random_overlaps)
     
     # empirical p-value 
     
@@ -636,46 +634,34 @@ for(d in distance){
   # ######### save tables
   # ordered by p-value
   
-  # 
-  # write.table(df_list[[d]],quote=F,row.names=T,col.names = T,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
-  #                                                                       trait,
-  #                                                                       "/",
-  #                                                                       currentDate,
-  #                                                                       "_top623_DEA_timecourse_pvals_hyperg_",
-  #                                                                       trait,
-  #                                                                       "_genes_enrichment_10k_permutations_",
-  #                                                                       d,
-  #                                                                       "_kb_from_credible_regions.txt",sep=""),sep="\t")
-  # write.table(overlap_list[[d]],quote=F,row.names=T,col.names = F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
-  #                                                                       trait,
-  #                                                                       "/",
-  #                                                                       currentDate,
-  #                                                                       "_top623_DEA_timecourse_overlaps_hyperg_",
-  #                                                                       trait,
-  #                                                                       "_genes_enrichment_",
-  #                                                                       d,
-  #                                                                       "_kb_from_credible_regions.txt",sep=""),sep="\t")
-  
-  # ordered by logFC
-  
-  write.table(df_list[[d]],quote=F,row.names=T,col.names = T,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
-                                                                        trait,
-                                                                        "/",
-                                                                        currentDate,
-                                                                        "_top623_orderedByLogFC_DEA_timecourse_pvals_hyperg_",
-                                                                        trait,
-                                                                        "_genes_enrichment_10k_permutations_",
-                                                                        d,
-                                                                        "_kb_from_credible_regions.txt",sep=""),sep="\t")
-  write.table(overlap_list[[d]],quote=F,row.names=T,col.names = F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
-                                                                             trait,
-                                                                             "/",
-                                                                             currentDate,
-                                                                             "_top623_orderedByLogFC_DEA_timecourse_overlaps_hyperg_",
-                                                                             trait,
-                                                                             "_genes_enrichment_",
-                                                                             d,
-                                                                             "_kb_from_credible_regions.txt",sep=""),sep="\t")
+
+    write.table(df_list[[d]],quote=F,row.names=T,col.names = T,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+                                                                          trait,
+                                                                          "/",
+                                                                          currentDate,
+                                                                          "_",
+                                                                          type,
+                                                                          "_ordered_by_",
+                                                                          order,
+                                                                          "_DEA_timecourse_pvals_hyperg_",
+                                                                          trait,
+                                                                          "_genes_enrichment_10k_permutations_",
+                                                                          d,
+                                                                          "_kb_from_credible_regions.txt",sep=""),sep="\t")
+    write.table(overlap_list[[d]],quote=F,row.names=T,col.names = F,file=paste("/Users/Marta/Documents/WTCHG/DPhil/Data/GWAS_list/Feb_17_credible_set_",
+                                                                          trait,
+                                                                          "/",
+                                                                          currentDate,
+                                                                          "_",
+                                                                          type,
+                                                                          "_ordered_by_",
+                                                                          order,
+                                                                          "_DEA_timecourse_overlaps_hyperg_",
+                                                                          trait,
+                                                                          "_genes_enrichment_",
+                                                                          d,
+                                                                          "_kb_from_credible_regions.txt",sep=""),sep="\t")
+
 }
 
 
