@@ -1,5 +1,4 @@
-# /apps/well/R/3.1.0/bin/R
-# module load R/3.1.0
+# module load R/3.4.3
 
 ## load libraries
 library("WGCNA")
@@ -9,14 +8,19 @@ library("DESeq2")
 library(RDAVIDWebService)
 library(ggplot2)
 
-#source("/well/got2d/agata/scripts/hypergeo.R")
-#source("/well/got2d/agata/scripts/get_TF_targets_from_peaks.R")
+Power = 10
+Size = 120
+deepsplit = 2
+method = "signed hybrid"
 
 
-Power=12   # select power after checking the softThreshold file
+# directories
+input = "../data/"
+output = "../results/"
 
 ## load data
-load("/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz")  # 15221 genes and lincRNA
+load(paste(input,"/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",sep = ""),
+           verbose = T)  # 15221 genes and lincRNA
 
 dim(dge_cc$counts)
 # [1] 15221    24
