@@ -1,12 +1,13 @@
 # module load R/3.4.3
 
 ## load libraries
-library("WGCNA")
-allowWGCNAThreads()
+
 library(edgeR)
 library("DESeq2")
 library(RDAVIDWebService)
 library(ggplot2)
+library("WGCNA") # load the libraries in this order or the cor() function from WGCNA will be masked
+allowWGCNAThreads()
 
 Power = 10
 Size = 120
@@ -19,7 +20,7 @@ input = "../data/"
 output = "../results/"
 
 ## load data
-load(paste(input,"/Users/Marta/Documents/WTCHG/DPhil/Data/Diff_v2/session_objects/dge_cc.xz",sep = ""),
+load(paste(input,"dge_cc.xz",sep = ""),
            verbose = T)  # 15221 genes and lincRNA
 
 dim(dge_cc$counts)
@@ -34,11 +35,11 @@ rownames(counts)[which(duplicated(rownames(counts)))]
 # no duplicates
 
 
-subject = sapply(strsplit(colnames(counts), split = "-"), function(x)
+subject = sapply(strsplit(colnames(counts), split = "_"), function(x)
   x[2]) # takes second element of column names after splitting by "_"
 design = data.frame(
   row.names = colnames(counts),
-  stage = dge$samples$group,
+  stage = dge_cc$samples$group,
   subject = subject
 ) # design is the same for both
 dds <- DESeqDataSetFromMatrix(
